@@ -14,16 +14,35 @@ const Map<String, Color> kDefaultCategoryColors = {
   'Other': Color(0xFF6C757D),
 };
 
-/// A small, fixed palette offered when picking a category's color, kept in
-/// sync with the hex equivalents of [kDefaultCategoryColors] plus a couple
-/// of extras, so custom categories can look at home next to the defaults.
+/// The palette offered when picking a category's color. Starts with the
+/// hex equivalents of [kDefaultCategoryColors] (so custom categories can
+/// look at home next to the defaults), then a broader spread of hues and a
+/// couple of neutrals, giving 24 options in total.
 const List<String> kCategoryColorSwatches = [
+  // Matches the 7 default categories' colors, in the same order.
   '#5338FC',
   '#2E86AB',
   '#06A77D',
   '#C77DFF',
   '#F77F00',
   '#E63946',
-  '#118AB2',
   '#6C757D',
+  // Additional hues, for custom categories.
+  '#118AB2',
+  '#3A86FF',
+  '#4361EE',
+  '#7209B7',
+  '#9B5DE5',
+  '#8338EC',
+  '#F15BB5',
+  '#EF476F',
+  '#FB5607',
+  '#E76F51',
+  '#FFD60A',
+  '#FFCA3A',
+  '#06D6A0',
+  '#00BBF9',
+  '#00F5D4',
+  '#A0522D',
+  '#495057',
 ];

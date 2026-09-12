@@ -49,12 +49,15 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
           title: Text(existing == null ? 'New category' : 'Rename category'),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                 TextFormField(
                   controller: controller,
                   autofocus: true,
@@ -75,11 +78,13 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                         selected: selectedColorHex == hex,
                         onTap: () => setDialogState(() => selectedColorHex = hex),
                       ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
+        ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
