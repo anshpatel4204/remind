@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_constants.dart';
-import '../../../../core/constants/category_colors.dart';
-import '../../../../core/utils/color_utils.dart';
-import '../../../../core/utils/date_formatting.dart';
-import '../../../../core/utils/task_status_calculator.dart';
 import '../../../../data/models/category_model.dart';
 import '../../../../data/models/enums.dart';
 import '../../../../data/models/tag_model.dart';
@@ -13,17 +9,23 @@ import '../../../../data/models/task_model.dart';
 import '../../../../presentation/widgets/repository_scope.dart';
 import '../../../categories/presentation/screens/categories_screen.dart';
 import '../../../tags/presentation/screens/tags_screen.dart';
-import '../widgets/priority_badge.dart';
-import '../widgets/status_badge.dart';
 import '../widgets/task_filter_sheet.dart';
+import '../widgets/task_list_tile.dart';
 import 'task_details_screen.dart';
 import 'task_form_screen.dart';
 
 /// The Tasks tab: lists tasks (filtered/sorted per [TaskFilter]), with
 /// quick actions to complete, pin, edit, and delete, a FAB to add a new
 /// one, and entry points to filter/sort the list and manage categories/tags.
+///
+/// [initialFilter] lets another screen (e.g. Home's stat cards) deep-link
+/// into a specific view - "show me what's overdue" - by pushing this
+/// screen already filtered, without either screen needing to share any
+/// other state.
 class TasksScreen extends StatefulWidget {
-  const TasksScreen({super.key});
+  const TasksScreen({super.key, this.initialFilter});
+
+  final TaskFilter? initialFilter;
 
   @override
   State<TasksScreen> createState() => _TasksScreenState();
@@ -32,7 +34,13 @@ class TasksScreen extends StatefulWidget {
 class _TasksScreenState extends State<TasksScreen> {
   late Future<_TaskListData> _future;
   bool _initialized = false;
-  TaskFilter _filter = const TaskFilter();
+  late TaskFilter _filter;
+
+  @override
+  void initState() {
+    super.initState();
+    _filter = widget.initialFilter ?? const TaskFilter();
+  }
 
   // Loading the task list depends on RepositoryScope.of(context), which
   // (via dependOnInheritedWidgetOfExactType) cannot be called from
@@ -53,11 +61,27 @@ class _TasksScreenState extends State<TasksScreen> {
     final categories = await repos.categoryRepository.getAllCategories();
     final tags = await repos.tagRepository.getAllTags();
     final categoryById = {for (final c in categories) if (c.id != null) c.id!: c};
+
+    final now = DateTime.now();
+    final tagsByTaskId = <int, List<TagModel>>{};
+    final activeSnoozeTaskIds = <int>{};
+    for (final task in tasks) {
+      final id = task.id!;
+      tagsByTaskId[id] = await repos.taskRepository.getTagsForTask(id);
+      final reminders = await repos.reminderRepository.getRemindersForTask(id);
+      final hasActiveSnooze = reminders.any(
+        (r) => r.isEnabled && r.snoozedUntil != null && r.snoozedUntil!.isAfter(now),
+      );
+      if (hasActiveSnooze) activeSnoozeTaskIds.add(id);
+    }
+
     return _TaskListData(
       tasks: tasks,
       categoryById: categoryById,
       categories: categories,
       tags: tags,
+      tagsByTaskId: tagsByTaskId,
+      activeSnoozeTaskIds: activeSnoozeTaskIds,
     );
   }
 
@@ -189,6 +213,9 @@ class _TasksScreenState extends State<TasksScreen> {
       body: FutureBuilder<_TaskListData>(
         future: _future,
         builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return _TaskListErrorView(onRetry: _reload);
+          }
           if (snapshot.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -223,9 +250,11 @@ class _TasksScreenState extends State<TasksScreen> {
                             final task = data.tasks[index];
                             final category =
                                 task.categoryId == null ? null : data.categoryById[task.categoryId];
-                            return _TaskListTile(
+                            return TaskListTile(
                               task: task,
                               category: category,
+                              tags: data.tagsByTaskId[task.id] ?? const [],
+                              hasActiveSnooze: data.activeSnoozeTaskIds.contains(task.id),
                               onTap: () => _openDetails(task),
                               onToggleComplete: () => _toggleComplete(task),
                               onTogglePin: () => _togglePin(task),
@@ -241,6 +270,7 @@ class _TasksScreenState extends State<TasksScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'tasks-add-task-fab',
         onPressed: _openAddTask,
         tooltip: 'Add task',
         child: const Icon(Icons.add),
@@ -255,98 +285,16 @@ class _TaskListData {
     required this.categoryById,
     required this.categories,
     required this.tags,
+    required this.tagsByTaskId,
+    required this.activeSnoozeTaskIds,
   });
 
   final List<TaskModel> tasks;
   final Map<int, CategoryModel> categoryById;
   final List<CategoryModel> categories;
   final List<TagModel> tags;
-}
-
-class _TaskListTile extends StatelessWidget {
-  const _TaskListTile({
-    required this.task,
-    required this.category,
-    required this.onTap,
-    required this.onToggleComplete,
-    required this.onTogglePin,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  final TaskModel task;
-  final CategoryModel? category;
-  final VoidCallback onTap;
-  final VoidCallback onToggleComplete;
-  final VoidCallback onTogglePin;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final isCompleted = task.status == TaskStatus.completed;
-    final displayStatus = TaskStatusCalculator.displayStatusFor(task, now: DateTime.now());
-    final categoryColor =
-        category == null ? null : (colorFromHex(category!.color) ?? kDefaultCategoryColors[category!.name]);
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        onTap: onTap,
-        leading: Checkbox(value: isCompleted, onChanged: (_) => onToggleComplete()),
-        title: Text(
-          task.title,
-          style: isCompleted ? const TextStyle(decoration: TextDecoration.lineThrough) : null,
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: [
-                PriorityBadge(priority: task.priority),
-                StatusBadge(status: displayStatus),
-                if (category != null)
-                  Chip(
-                    label: Text(category!.name),
-                    backgroundColor: (categoryColor ?? Theme.of(context).colorScheme.secondaryContainer)
-                        .withValues(alpha: 0.15),
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-              ],
-            ),
-            if (task.dueDate != null) ...[
-              const SizedBox(height: 4),
-              Text(formatDateTime(task.dueDate!), style: Theme.of(context).textTheme.bodySmall),
-            ],
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: Icon(task.isPinned ? Icons.push_pin : Icons.push_pin_outlined),
-              onPressed: onTogglePin,
-              tooltip: task.isPinned ? 'Unpin' : 'Pin',
-            ),
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'edit') onEdit();
-                if (value == 'delete') onDelete();
-              },
-              itemBuilder: (context) => const [
-                PopupMenuItem(value: 'edit', child: Text('Edit')),
-                PopupMenuItem(value: 'delete', child: Text('Delete')),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  final Map<int, List<TagModel>> tagsByTaskId;
+  final Set<int> activeSnoozeTaskIds;
 }
 
 class _EmptyTasksView extends StatelessWidget {
@@ -412,6 +360,39 @@ class _NoMatchingTasksView extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             OutlinedButton(onPressed: onClearFilters, child: const Text('Clear filters')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TaskListErrorView extends StatelessWidget {
+  const _TaskListErrorView({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 48,
+              color: Theme.of(context).colorScheme.error,
+            ),
+            const SizedBox(height: 16),
+            Text('Something went wrong loading your tasks', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+            ),
           ],
         ),
       ),

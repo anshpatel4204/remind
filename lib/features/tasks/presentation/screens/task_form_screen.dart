@@ -11,9 +11,14 @@ import '../../../../presentation/widgets/repository_scope.dart';
 /// A single form used for both creating a new task and editing an existing
 /// one. Pass [existingTask] to edit; omit it to create.
 class TaskFormScreen extends StatefulWidget {
-  const TaskFormScreen({super.key, this.existingTask});
+  const TaskFormScreen({super.key, this.existingTask, this.initialDueDate});
 
   final TaskModel? existingTask;
+
+  /// Pre-fills the due date when creating a new task (ignored when
+  /// [existingTask] is set) - used by the Calendar tab's Add Task FAB so
+  /// adding a task for a selected day doesn't require re-picking the date.
+  final DateTime? initialDueDate;
 
   bool get isEditing => existingTask != null;
 
@@ -59,6 +64,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         _dueDate = DateTime(task.dueDate!.year, task.dueDate!.month, task.dueDate!.day);
         _dueTime = TimeOfDay(hour: task.dueDate!.hour, minute: task.dueDate!.minute);
       }
+    } else if (widget.initialDueDate != null) {
+      final initial = widget.initialDueDate!;
+      _dueDate = DateTime(initial.year, initial.month, initial.day);
     }
   }
 

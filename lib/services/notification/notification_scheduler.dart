@@ -86,6 +86,14 @@ class NotificationScheduler {
     return _transport.requestNotificationsPermission();
   }
 
+  /// Read-only status checks for a Settings-style screen: report the
+  /// current state without ever prompting the user (unlike
+  /// [ensureNotificationPermission], which requests permission if it
+  /// hasn't been decided yet).
+  Future<bool> notificationsEnabled() => _transport.areNotificationsEnabled();
+
+  Future<bool> canScheduleExactAlarms() => _transport.canScheduleExactNotifications();
+
   /// Creates a new reminder for [taskId] and schedules its notification in
   /// the same step, so a reminder row is never left without a matching
   /// scheduled notification (or vice versa).

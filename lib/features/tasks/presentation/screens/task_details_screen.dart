@@ -10,12 +10,13 @@ import '../../../../data/models/reminder_model.dart';
 import '../../../../data/models/tag_model.dart';
 import '../../../../data/models/task_model.dart';
 import '../../../../presentation/widgets/repository_scope.dart';
+import '../../../../services/notification/notification_scheduler.dart';
 import '../widgets/priority_badge.dart';
 import '../widgets/status_badge.dart';
 import 'task_form_screen.dart';
 
 /// Full detail view for a single task: every field, its reminder (if any),
-/// and the Complete/Reopen/Edit/Delete actions.
+/// and the Complete/Edit/Delete/Snooze/Reschedule actions.
 class TaskDetailsScreen extends StatefulWidget {
   const TaskDetailsScreen({super.key, required this.taskId});
 
@@ -28,6 +29,7 @@ class TaskDetailsScreen extends StatefulWidget {
 class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   late Future<_TaskDetailsData?> _future;
   bool _initialized = false;
+  bool _busy = false;
 
   // Loading depends on RepositoryScope.of(context), which cannot be called
   // from initState() - it must wait until didChangeDependencies().
@@ -65,16 +67,23 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   }
 
   Future<void> _complete(TaskModel task) async {
+    setState(() => _busy = true);
     // Goes through notificationScheduler (not taskRepository directly) so
     // the task's reminder notification(s) are cancelled - and, for a
     // recurring task, rescheduled for the next occurrence - rather than
     // firing again for a task that's already done.
     await RepositoryScope.of(context).notificationScheduler.completeTask(task.id!);
+    if (!mounted) return;
+    setState(() => _busy = false);
     _reload();
+    _showSnack('Task completed');
   }
 
   Future<void> _reopen(TaskModel task) async {
+    setState(() => _busy = true);
     await RepositoryScope.of(context).taskRepository.reopenTask(task.id!);
+    if (!mounted) return;
+    setState(() => _busy = false);
     _reload();
   }
 
@@ -112,6 +121,68 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     Navigator.of(context).pop();
   }
 
+  Future<void> _snooze(ReminderModel reminder) async {
+    final choice = await showModalBottomSheet<_SnoozeChoice>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => const _SnoozeOptionsSheet(),
+    );
+    if (choice == null) return;
+    if (!mounted) return;
+
+    setState(() => _busy = true);
+    await RepositoryScope.of(context).notificationScheduler.snoozeReminder(
+          reminder.id!,
+          option: choice.option,
+          customDuration: choice.customDuration,
+        );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    _reload();
+    _showSnack('Reminder snoozed');
+  }
+
+  Future<void> _reschedule(ReminderModel reminder) async {
+    final initial = reminder.snoozedUntil ?? reminder.reminderTime;
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (pickedDate == null) return;
+    if (!mounted) return;
+    final pickedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+    );
+    if (pickedTime == null) return;
+    if (!mounted) return;
+
+    final newTime = DateTime(
+      pickedDate.year,
+      pickedDate.month,
+      pickedDate.day,
+      pickedTime.hour,
+      pickedTime.minute,
+    );
+
+    setState(() => _busy = true);
+    await RepositoryScope.of(context)
+        .notificationScheduler
+        .updateAndRescheduleReminder(reminder.id!, newTime);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    _reload();
+    _showSnack('Reminder rescheduled');
+  }
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -122,11 +193,25 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
           if (snapshot.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
+          if (snapshot.hasError) {
+            return _TaskDetailsErrorView(onRetry: _reload);
+          }
           final data = snapshot.data;
           if (data == null) {
             return const Center(child: Text('This task no longer exists.'));
           }
-          return _buildBody(context, data);
+          return Stack(
+            children: [
+              _buildBody(context, data),
+              if (_busy)
+                const Positioned.fill(
+                  child: ColoredBox(
+                    color: Colors.black12,
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                ),
+            ],
+          );
         },
       ),
     );
@@ -148,6 +233,8 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         ? null
         : (colorFromHex(data.category!.color) ?? kDefaultCategoryColors[data.category!.name]);
     final isCompleted = task.status == TaskStatus.completed;
+    final reminder = data.reminder;
+    final canSnoozeOrReschedule = reminder != null && !isCompleted;
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -200,7 +287,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         const SizedBox(height: 20),
         Text('Reminder', style: Theme.of(context).textTheme.labelLarge),
         const SizedBox(height: 4),
-        Text(_reminderInfoText(data.reminder)),
+        Text(_reminderInfoText(reminder)),
         const SizedBox(height: 28),
         Wrap(
           spacing: 8,
@@ -208,25 +295,38 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
           children: [
             if (!isCompleted)
               FilledButton.icon(
-                onPressed: () => _complete(task),
+                onPressed: _busy ? null : () => _complete(task),
                 icon: const Icon(Icons.check),
                 label: const Text('Complete'),
               ),
             if (isCompleted)
               OutlinedButton.icon(
-                onPressed: () => _reopen(task),
+                onPressed: _busy ? null : () => _reopen(task),
                 icon: const Icon(Icons.replay),
                 label: const Text('Reopen'),
               ),
             OutlinedButton.icon(
-              onPressed: () => _edit(task),
+              onPressed: _busy ? null : () => _edit(task),
               icon: const Icon(Icons.edit_outlined),
               label: const Text('Edit'),
             ),
+            if (canSnoozeOrReschedule)
+              OutlinedButton.icon(
+                onPressed: _busy ? null : () => _snooze(reminder),
+                icon: const Icon(Icons.snooze_outlined),
+                label: const Text('Snooze'),
+              ),
+            if (canSnoozeOrReschedule)
+              OutlinedButton.icon(
+                onPressed: _busy ? null : () => _reschedule(reminder),
+                icon: const Icon(Icons.event_repeat_outlined),
+                label: const Text('Reschedule'),
+              ),
             OutlinedButton.icon(
-              onPressed: () => _delete(task),
+              onPressed: _busy ? null : () => _delete(task),
               icon: const Icon(Icons.delete_outline),
               label: const Text('Delete'),
+              style: OutlinedButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
             ),
           ],
         ),
@@ -236,6 +336,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
 
   String _reminderInfoText(ReminderModel? reminder) {
     if (reminder == null) return 'No reminder set';
+    if (reminder.snoozedUntil != null && reminder.snoozedUntil!.isAfter(DateTime.now())) {
+      return 'Snoozed until ${formatDateTime(reminder.snoozedUntil!)}';
+    }
     final base = 'Reminder set for ${formatDateTime(reminder.reminderTime)}';
     return reminder.isEnabled ? base : '$base (disabled)';
   }
@@ -253,4 +356,97 @@ class _TaskDetailsData {
   final CategoryModel? category;
   final List<TagModel> tags;
   final ReminderModel? reminder;
+}
+
+/// What the user picked from [_SnoozeOptionsSheet]: a preset [option], plus
+/// [customDuration] when [option] is [SnoozeOption.custom].
+class _SnoozeChoice {
+  const _SnoozeChoice(this.option, {this.customDuration});
+  final SnoozeOption option;
+  final Duration? customDuration;
+}
+
+/// Bottom sheet offering every preset in [SnoozeOption] plus a custom
+/// duration entry, matching the spec's required snooze presets.
+class _SnoozeOptionsSheet extends StatelessWidget {
+  const _SnoozeOptionsSheet();
+
+  static const _presets = [
+    (SnoozeOption.fiveMinutes, '5 minutes'),
+    (SnoozeOption.tenMinutes, '10 minutes'),
+    (SnoozeOption.fifteenMinutes, '15 minutes'),
+    (SnoozeOption.thirtyMinutes, '30 minutes'),
+    (SnoozeOption.oneHour, '1 hour'),
+    (SnoozeOption.tomorrow, 'Tomorrow, same time'),
+  ];
+
+  Future<void> _pickCustom(BuildContext context) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+      helpText: 'Snooze until',
+    );
+    if (picked == null) return;
+    final now = DateTime.now();
+    var target = DateTime(now.year, now.month, now.day, picked.hour, picked.minute);
+    if (!target.isAfter(now)) target = target.add(const Duration(days: 1));
+    if (context.mounted) {
+      Navigator.of(context).pop(
+        _SnoozeChoice(SnoozeOption.custom, customDuration: target.difference(now)),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text('Snooze for', style: Theme.of(context).textTheme.titleMedium),
+            ),
+            for (final preset in _presets)
+              ListTile(
+                title: Text(preset.$2),
+                onTap: () => Navigator.of(context).pop(_SnoozeChoice(preset.$1)),
+              ),
+            ListTile(
+              title: const Text('Custom time...'),
+              onTap: () => _pickCustom(context),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TaskDetailsErrorView extends StatelessWidget {
+  const _TaskDetailsErrorView({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
+            const SizedBox(height: 12),
+            const Text('Something went wrong loading this task.'),
+            const SizedBox(height: 16),
+            FilledButton(onPressed: onRetry, child: const Text('Retry')),
+          ],
+        ),
+      ),
+    );
+  }
 }
