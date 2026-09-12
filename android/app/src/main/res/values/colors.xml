@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Sampled from the REmind logo's background gradient. -->
+    <color name="launch_background_color">#0B1240</color>
+</resources>
