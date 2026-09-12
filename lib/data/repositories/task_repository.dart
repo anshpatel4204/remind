@@ -1,7 +1,9 @@
+import '../../core/utils/task_status_calculator.dart';
 import '../datasources/task_data_source.dart';
 import '../datasources/task_tag_data_source.dart';
 import '../models/enums.dart';
 import '../models/tag_model.dart';
+import '../models/task_filter.dart';
 import '../models/task_model.dart';
 
 /// Application-facing operations for tasks, including their tag
@@ -47,9 +49,99 @@ class TaskRepository {
   Future<List<TaskModel>> getAllTasks({
     TaskStatus? status,
     int? categoryId,
+    TaskPriority? priority,
+    int? tagId,
     bool? pinnedOnly,
+    DateTime? dueDateFrom,
+    DateTime? dueDateTo,
+    bool noDueDateOnly = false,
+    TaskSortOption sortBy = TaskSortOption.dueDate,
+    bool ascending = true,
   }) {
-    return _taskDataSource.getAll(status: status, categoryId: categoryId, pinnedOnly: pinnedOnly);
+    return _taskDataSource.getAll(
+      status: status,
+      categoryId: categoryId,
+      priority: priority,
+      tagId: tagId,
+      pinnedOnly: pinnedOnly,
+      dueDateFrom: dueDateFrom,
+      dueDateTo: dueDateTo,
+      noDueDateOnly: noDueDateOnly,
+      sortBy: sortBy,
+      ascending: ascending,
+    );
+  }
+
+  /// Applies every criterion in [filter] - category, tag, priority, a due
+  /// date shortcut, and a display status that includes the computed
+  /// Overdue/Snoozed states - plus its chosen sort, and returns the
+  /// matching tasks.
+  ///
+  /// The mechanical filters (category/tag/priority/due-date range) run in
+  /// SQL via [getAllTasks]. [filter.status] cannot: it is a
+  /// [TaskDisplayStatus], which only exists as a computed value (see
+  /// [TaskStatusCalculator]), not a stored column - so it is applied as a
+  /// second pass over the SQL results instead. [now] exists only so tests
+  /// can pin "the current moment"; real callers should leave it as the
+  /// current device time.
+  Future<List<TaskModel>> getFilteredTasks(TaskFilter filter, {DateTime? now}) async {
+    final effectiveNow = now ?? DateTime.now();
+    final window = _resolveDueDateWindow(
+      filter.dueDateFilter,
+      filter.customDueDateFrom,
+      filter.customDueDateTo,
+      effectiveNow,
+    );
+
+    final tasks = await getAllTasks(
+      categoryId: filter.categoryId,
+      priority: filter.priority,
+      tagId: filter.tagId,
+      dueDateFrom: window.from,
+      dueDateTo: window.to,
+      noDueDateOnly: window.noDueDateOnly,
+      sortBy: filter.sortBy,
+      ascending: filter.ascending,
+    );
+
+    if (filter.status == null) return tasks;
+    return tasks
+        .where((t) => TaskStatusCalculator.displayStatusFor(t, now: effectiveNow) == filter.status)
+        .toList();
+  }
+
+  /// Resolves a [DueDateFilter] shortcut into a concrete `[from, to]` due
+  /// date window (or a "no due date only" flag) as of [now]. Weeks run
+  /// Monday-Sunday.
+  ({DateTime? from, DateTime? to, bool noDueDateOnly}) _resolveDueDateWindow(
+    DueDateFilter dueDateFilter,
+    DateTime? customFrom,
+    DateTime? customTo,
+    DateTime now,
+  ) {
+    switch (dueDateFilter) {
+      case DueDateFilter.any:
+        return (from: null, to: null, noDueDateOnly: false);
+      case DueDateFilter.today:
+        final startOfDay = DateTime(now.year, now.month, now.day);
+        final endOfDay = startOfDay
+            .add(const Duration(days: 1))
+            .subtract(const Duration(milliseconds: 1));
+        return (from: startOfDay, to: endOfDay, noDueDateOnly: false);
+      case DueDateFilter.thisWeek:
+        final startOfDay = DateTime(now.year, now.month, now.day);
+        final startOfWeek = startOfDay.subtract(Duration(days: startOfDay.weekday - 1));
+        final endOfWeek = startOfWeek
+            .add(const Duration(days: 7))
+            .subtract(const Duration(milliseconds: 1));
+        return (from: startOfWeek, to: endOfWeek, noDueDateOnly: false);
+      case DueDateFilter.overdue:
+        return (from: null, to: now, noDueDateOnly: false);
+      case DueDateFilter.noDueDate:
+        return (from: null, to: null, noDueDateOnly: true);
+      case DueDateFilter.custom:
+        return (from: customFrom, to: customTo, noDueDateOnly: false);
+    }
   }
 
   /// Updates [task] as given, after normalizing it so status and

@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import '../database/app_database.dart';
 import '../database/db_constants.dart';
 import '../models/enums.dart';
+import '../models/task_filter.dart';
 import '../models/task_model.dart';
 
 /// Owns the raw SQLite access for the tasks table.
@@ -28,37 +29,102 @@ class TaskDataSource {
     return TaskModel.fromMap(rows.first);
   }
 
-  /// Fetches tasks, optionally filtered by [status], [categoryId], and/or
-  /// [pinnedOnly]. All filters are AND-ed together when more than one is
-  /// supplied. Results are ordered pinned-first, then by due date.
+  /// Fetches tasks, optionally filtered by [status], [categoryId],
+  /// [priority], [tagId], and/or [pinnedOnly]; all supplied filters are
+  /// AND-ed together. The due date can additionally be narrowed to a range
+  /// ([dueDateFrom]/[dueDateTo], either end optional) or to tasks with no
+  /// due date at all ([noDueDateOnly] - which takes priority over the range
+  /// when both are supplied, since "has no due date" and "due date in this
+  /// range" are mutually exclusive). Results are always pinned-first; within
+  /// that, ordered by [sortBy] in [ascending] or descending direction.
   Future<List<TaskModel>> getAll({
     TaskStatus? status,
     int? categoryId,
+    TaskPriority? priority,
+    int? tagId,
     bool? pinnedOnly,
+    DateTime? dueDateFrom,
+    DateTime? dueDateTo,
+    bool noDueDateOnly = false,
+    TaskSortOption sortBy = TaskSortOption.dueDate,
+    bool ascending = true,
   }) async {
     final Database db = await _appDatabase.database;
-    final conditions = <String>[];
-    final args = <Object?>[];
+
+    final whereConditions = <String>[];
+    final whereArgs = <Object?>[];
 
     if (status != null) {
-      conditions.add('${TasksTable.status} = ?');
-      args.add(status.dbValue);
+      whereConditions.add('t.${TasksTable.status} = ?');
+      whereArgs.add(status.dbValue);
     }
     if (categoryId != null) {
-      conditions.add('${TasksTable.categoryId} = ?');
-      args.add(categoryId);
+      whereConditions.add('t.${TasksTable.categoryId} = ?');
+      whereArgs.add(categoryId);
+    }
+    if (priority != null) {
+      whereConditions.add('t.${TasksTable.priority} = ?');
+      whereArgs.add(priority.dbValue);
     }
     if (pinnedOnly == true) {
-      conditions.add('${TasksTable.isPinned} = 1');
+      whereConditions.add('t.${TasksTable.isPinned} = 1');
+    }
+    if (noDueDateOnly) {
+      whereConditions.add('t.${TasksTable.dueDate} IS NULL');
+    } else {
+      if (dueDateFrom != null) {
+        whereConditions.add('t.${TasksTable.dueDate} >= ?');
+        whereArgs.add(dueDateFrom.millisecondsSinceEpoch);
+      }
+      if (dueDateTo != null) {
+        whereConditions.add('t.${TasksTable.dueDate} <= ?');
+        whereArgs.add(dueDateTo.millisecondsSinceEpoch);
+      }
     }
 
-    final rows = await db.query(
-      TasksTable.name,
-      where: conditions.isEmpty ? null : conditions.join(' AND '),
-      whereArgs: conditions.isEmpty ? null : args,
-      orderBy: '${TasksTable.isPinned} DESC, ${TasksTable.dueDate} ASC',
-    );
+    // Filtering by tag requires a join against the many-to-many task_tags
+    // table; only added to the query when a tagId filter is actually in
+    // use, so the common no-tag-filter case stays a plain single-table
+    // query.
+    var joinClause = '';
+    final joinArgs = <Object?>[];
+    if (tagId != null) {
+      joinClause =
+          'INNER JOIN ${TaskTagsTable.name} tt ON tt.${TaskTagsTable.taskId} = t.${TasksTable.id} '
+          'AND tt.${TaskTagsTable.tagId} = ?';
+      joinArgs.add(tagId);
+    }
+
+    final whereClause = whereConditions.isEmpty ? '' : 'WHERE ${whereConditions.join(' AND ')}';
+    final sql = '''
+SELECT t.* FROM ${TasksTable.name} t
+$joinClause
+$whereClause
+ORDER BY ${_orderByClause(sortBy, ascending)}
+''';
+
+    final rows = await db.rawQuery(sql, [...joinArgs, ...whereArgs]);
     return rows.map(TaskModel.fromMap).toList();
+  }
+
+  /// Builds the ORDER BY clause for [getAll]. Pinned tasks always come
+  /// first. Tasks with no due date always sort after ones that have one,
+  /// regardless of [ascending], since "no due date" isn't meaningfully
+  /// earlier or later than any real date.
+  String _orderByClause(TaskSortOption sortBy, bool ascending) {
+    final direction = ascending ? 'ASC' : 'DESC';
+    switch (sortBy) {
+      case TaskSortOption.dueDate:
+        return '${TasksTable.isPinned} DESC, '
+            '${TasksTable.dueDate} IS NULL, '
+            '${TasksTable.dueDate} $direction';
+      case TaskSortOption.priority:
+        return '${TasksTable.isPinned} DESC, ${TasksTable.priority} $direction';
+      case TaskSortOption.createdDate:
+        return '${TasksTable.isPinned} DESC, ${TasksTable.createdAt} $direction';
+      case TaskSortOption.alphabetical:
+        return '${TasksTable.isPinned} DESC, ${TasksTable.title} COLLATE NOCASE $direction';
+    }
   }
 
   Future<int> update(TaskModel task) async {

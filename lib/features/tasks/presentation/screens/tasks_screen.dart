@@ -7,15 +7,21 @@ import '../../../../core/utils/date_formatting.dart';
 import '../../../../core/utils/task_status_calculator.dart';
 import '../../../../data/models/category_model.dart';
 import '../../../../data/models/enums.dart';
+import '../../../../data/models/tag_model.dart';
+import '../../../../data/models/task_filter.dart';
 import '../../../../data/models/task_model.dart';
 import '../../../../presentation/widgets/repository_scope.dart';
+import '../../../categories/presentation/screens/categories_screen.dart';
+import '../../../tags/presentation/screens/tags_screen.dart';
 import '../widgets/priority_badge.dart';
 import '../widgets/status_badge.dart';
+import '../widgets/task_filter_sheet.dart';
 import 'task_details_screen.dart';
 import 'task_form_screen.dart';
 
-/// The Tasks tab: lists every task, with quick actions to complete, pin,
-/// edit, and delete, plus a FAB to add a new one.
+/// The Tasks tab: lists tasks (filtered/sorted per [TaskFilter]), with
+/// quick actions to complete, pin, edit, and delete, a FAB to add a new
+/// one, and entry points to filter/sort the list and manage categories/tags.
 class TasksScreen extends StatefulWidget {
   const TasksScreen({super.key});
 
@@ -26,6 +32,7 @@ class TasksScreen extends StatefulWidget {
 class _TasksScreenState extends State<TasksScreen> {
   late Future<_TaskListData> _future;
   bool _initialized = false;
+  TaskFilter _filter = const TaskFilter();
 
   // Loading the task list depends on RepositoryScope.of(context), which
   // (via dependOnInheritedWidgetOfExactType) cannot be called from
@@ -42,10 +49,16 @@ class _TasksScreenState extends State<TasksScreen> {
 
   Future<_TaskListData> _load() async {
     final repos = RepositoryScope.of(context);
-    final tasks = await repos.taskRepository.getAllTasks();
+    final tasks = await repos.taskRepository.getFilteredTasks(_filter);
     final categories = await repos.categoryRepository.getAllCategories();
+    final tags = await repos.tagRepository.getAllTags();
     final categoryById = {for (final c in categories) if (c.id != null) c.id!: c};
-    return _TaskListData(tasks: tasks, categoryById: categoryById);
+    return _TaskListData(
+      tasks: tasks,
+      categoryById: categoryById,
+      categories: categories,
+      tags: tags,
+    );
   }
 
   void _reload() {
@@ -115,10 +128,58 @@ class _TasksScreenState extends State<TasksScreen> {
     _reload();
   }
 
+  Future<void> _openFilterSheet(_TaskListData data) async {
+    final result = await showTaskFilterSheet(
+      context,
+      current: _filter,
+      categories: data.categories,
+      tags: data.tags,
+    );
+    if (result == null) return;
+    setState(() => _filter = result);
+    _reload();
+  }
+
+  void _clearFilters() {
+    setState(() => _filter = const TaskFilter());
+    _reload();
+  }
+
+  Future<void> _openManage(Widget screen) async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
+    _reload();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Tasks')),
+      appBar: AppBar(
+        title: const Text('Tasks'),
+        actions: [
+          FutureBuilder<_TaskListData>(
+            future: _future,
+            builder: (context, snapshot) {
+              final data = snapshot.data;
+              return IconButton(
+                icon: Icon(_filter.hasActiveFilters ? Icons.filter_alt : Icons.filter_alt_outlined),
+                tooltip: 'Filter & sort',
+                onPressed: data == null ? null : () => _openFilterSheet(data),
+              );
+            },
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Manage',
+            onSelected: (value) {
+              if (value == 'categories') _openManage(const CategoriesScreen());
+              if (value == 'tags') _openManage(const TagsScreen());
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: 'categories', child: Text('Manage categories')),
+              PopupMenuItem(value: 'tags', child: Text('Manage tags')),
+            ],
+          ),
+        ],
+      ),
       body: FutureBuilder<_TaskListData>(
         future: _future,
         builder: (context, snapshot) {
@@ -126,28 +187,50 @@ class _TasksScreenState extends State<TasksScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           final data = snapshot.data!;
-          if (data.tasks.isEmpty) {
-            return _EmptyTasksView(onAddTask: _openAddTask);
-          }
-          return RefreshIndicator(
-            onRefresh: () async => _reload(),
-            child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
-              itemCount: data.tasks.length,
-              itemBuilder: (context, index) {
-                final task = data.tasks[index];
-                final category = task.categoryId == null ? null : data.categoryById[task.categoryId];
-                return _TaskListTile(
-                  task: task,
-                  category: category,
-                  onTap: () => _openDetails(task),
-                  onToggleComplete: () => _toggleComplete(task),
-                  onTogglePin: () => _togglePin(task),
-                  onEdit: () => _openEdit(task),
-                  onDelete: () => _confirmDelete(task),
-                );
-              },
-            ),
+          return Column(
+            children: [
+              if (_filter.hasActiveFilters)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.filter_alt, size: 16),
+                      const SizedBox(width: 6),
+                      const Expanded(
+                        child: Text('Filters active', style: TextStyle(fontSize: 12)),
+                      ),
+                      TextButton(onPressed: _clearFilters, child: const Text('Clear')),
+                    ],
+                  ),
+                ),
+              Expanded(
+                child: data.tasks.isEmpty
+                    ? (_filter.hasActiveFilters
+                        ? _NoMatchingTasksView(onClearFilters: _clearFilters)
+                        : _EmptyTasksView(onAddTask: _openAddTask))
+                    : RefreshIndicator(
+                        onRefresh: () async => _reload(),
+                        child: ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
+                          itemCount: data.tasks.length,
+                          itemBuilder: (context, index) {
+                            final task = data.tasks[index];
+                            final category =
+                                task.categoryId == null ? null : data.categoryById[task.categoryId];
+                            return _TaskListTile(
+                              task: task,
+                              category: category,
+                              onTap: () => _openDetails(task),
+                              onToggleComplete: () => _toggleComplete(task),
+                              onTogglePin: () => _togglePin(task),
+                              onEdit: () => _openEdit(task),
+                              onDelete: () => _confirmDelete(task),
+                            );
+                          },
+                        ),
+                      ),
+              ),
+            ],
           );
         },
       ),
@@ -161,10 +244,17 @@ class _TasksScreenState extends State<TasksScreen> {
 }
 
 class _TaskListData {
-  const _TaskListData({required this.tasks, required this.categoryById});
+  const _TaskListData({
+    required this.tasks,
+    required this.categoryById,
+    required this.categories,
+    required this.tags,
+  });
 
   final List<TaskModel> tasks;
   final Map<int, CategoryModel> categoryById;
+  final List<CategoryModel> categories;
+  final List<TagModel> tags;
 }
 
 class _TaskListTile extends StatelessWidget {
@@ -281,6 +371,41 @@ class _EmptyTasksView extends StatelessWidget {
               icon: const Icon(Icons.add),
               label: const Text('Add task'),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NoMatchingTasksView extends StatelessWidget {
+  const _NoMatchingTasksView({required this.onClearFilters});
+
+  final VoidCallback onClearFilters;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.filter_alt_outlined,
+              size: 48,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+            const SizedBox(height: 16),
+            Text('No tasks match these filters', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(
+              'Try a different filter, or clear them to see everything.',
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            OutlinedButton(onPressed: onClearFilters, child: const Text('Clear filters')),
           ],
         ),
       ),

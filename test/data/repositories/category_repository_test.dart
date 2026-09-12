@@ -1,7 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:remind/data/datasources/category_data_source.dart';
+import 'package:remind/data/datasources/task_data_source.dart';
+import 'package:remind/data/datasources/task_tag_data_source.dart';
 import 'package:remind/data/repositories/category_repository.dart';
+import 'package:remind/data/repositories/task_repository.dart';
 
 import '../../test_helpers/test_database_factory.dart';
 
@@ -10,10 +13,15 @@ void main() {
 
   late TestAppDatabase testDb;
   late CategoryRepository repository;
+  late TaskRepository taskRepository;
 
   setUp(() {
     testDb = TestAppDatabase.create();
     repository = CategoryRepository(CategoryDataSource(testDb.appDatabase));
+    taskRepository = TaskRepository(
+      TaskDataSource(testDb.appDatabase),
+      TaskTagDataSource(testDb.appDatabase),
+    );
   });
 
   tearDown(() => testDb.tearDown());
@@ -48,5 +56,19 @@ void main() {
 
     final stillThere = await repository.getCategory(work.id!);
     expect(stillThere, isNotNull);
+  });
+
+  group('deleting a category used by tasks', () {
+    test('leaves the tasks intact with categoryId cleared to null, not deleted', () async {
+      final created = await repository.createCategory(name: 'Side project');
+      final task = await taskRepository.createTask(title: 'Ship it', categoryId: created.id);
+
+      await repository.deleteCategory(created.id!);
+
+      expect(await repository.getCategory(created.id!), isNull);
+      final stillThere = await taskRepository.getTask(task.id!);
+      expect(stillThere, isNotNull);
+      expect(stillThere?.categoryId, isNull);
+    });
   });
 }

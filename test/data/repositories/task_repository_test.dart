@@ -1,11 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:remind/core/utils/task_status_calculator.dart';
 import 'package:remind/data/datasources/category_data_source.dart';
 import 'package:remind/data/datasources/recurrence_rule_data_source.dart';
 import 'package:remind/data/datasources/tag_data_source.dart';
 import 'package:remind/data/datasources/task_data_source.dart';
 import 'package:remind/data/datasources/task_tag_data_source.dart';
 import 'package:remind/data/models/enums.dart';
+import 'package:remind/data/models/task_filter.dart';
 import 'package:remind/data/repositories/category_repository.dart';
 import 'package:remind/data/repositories/recurrence_repository.dart';
 import 'package:remind/data/repositories/tag_repository.dart';
@@ -214,6 +216,208 @@ void main() {
       final task = await taskRepository.createTask(title: 'No recurrence');
       await taskRepository.deleteTask(task.id!);
       expect(await taskRepository.getTask(task.id!), isNull);
+    });
+  });
+
+  group('filtering', () {
+    test('getAllTasks filters by priority', () async {
+      await taskRepository.createTask(title: 'Low one', priority: TaskPriority.low);
+      await taskRepository.createTask(title: 'Urgent one', priority: TaskPriority.urgent);
+      await taskRepository.createTask(title: 'Urgent two', priority: TaskPriority.urgent);
+
+      final urgentTasks = await taskRepository.getAllTasks(priority: TaskPriority.urgent);
+      expect(urgentTasks, hasLength(2));
+      expect(urgentTasks.every((t) => t.priority == TaskPriority.urgent), isTrue);
+    });
+
+    test('getAllTasks filters by tag', () async {
+      final work = await tagRepository.createTag(name: 'work');
+      final home = await tagRepository.createTag(name: 'home');
+
+      await taskRepository.createTask(title: 'Work task', tagIds: [work.id!]);
+      await taskRepository.createTask(title: 'Home task', tagIds: [home.id!]);
+      await taskRepository.createTask(title: 'Both', tagIds: [work.id!, home.id!]);
+
+      final workTasks = await taskRepository.getAllTasks(tagId: work.id);
+      expect(workTasks.map((t) => t.title).toSet(), {'Work task', 'Both'});
+    });
+
+    test('getAllTasks with noDueDateOnly returns only tasks without a due date', () async {
+      await taskRepository.createTask(title: 'No date');
+      await taskRepository.createTask(title: 'Has date', dueDate: DateTime(2026, 1, 1));
+
+      final noDate = await taskRepository.getAllTasks(noDueDateOnly: true);
+      expect(noDate, hasLength(1));
+      expect(noDate.single.title, 'No date');
+    });
+
+    test('getAllTasks with a due date range returns only tasks due in that window', () async {
+      await taskRepository.createTask(title: 'Before', dueDate: DateTime(2026, 6, 1));
+      await taskRepository.createTask(title: 'Inside', dueDate: DateTime(2026, 6, 15));
+      await taskRepository.createTask(title: 'After', dueDate: DateTime(2026, 7, 1));
+
+      final inRange = await taskRepository.getAllTasks(
+        dueDateFrom: DateTime(2026, 6, 10),
+        dueDateTo: DateTime(2026, 6, 20),
+      );
+      expect(inRange, hasLength(1));
+      expect(inRange.single.title, 'Inside');
+    });
+
+    group('getFilteredTasks (display-status and date-preset aware)', () {
+      final now = DateTime(2026, 6, 15, 12, 0);
+
+      test('status filter matches computed display status, including Overdue', () async {
+        final overdue = await taskRepository.createTask(
+          title: 'Overdue task',
+          dueDate: now.subtract(const Duration(days: 1)),
+        );
+        await taskRepository.createTask(title: 'Pending task', dueDate: now.add(const Duration(days: 1)));
+        final completed = await taskRepository.createTask(title: 'Completed task');
+        await taskRepository.completeTask(completed.id!);
+
+        final overdueResults = await taskRepository.getFilteredTasks(
+          const TaskFilter(status: TaskDisplayStatus.overdue),
+          now: now,
+        );
+        expect(overdueResults.map((t) => t.id), [overdue.id]);
+
+        final completedResults = await taskRepository.getFilteredTasks(
+          const TaskFilter(status: TaskDisplayStatus.completed),
+          now: now,
+        );
+        expect(completedResults.map((t) => t.id), [completed.id]);
+      });
+
+      test('date filter "today" only returns tasks due that calendar day', () async {
+        await taskRepository.createTask(title: 'Earlier today', dueDate: DateTime(2026, 6, 15, 8));
+        await taskRepository.createTask(title: 'Later today', dueDate: DateTime(2026, 6, 15, 20));
+        await taskRepository.createTask(title: 'Tomorrow', dueDate: DateTime(2026, 6, 16, 8));
+        await taskRepository.createTask(title: 'No date');
+
+        final today = await taskRepository.getFilteredTasks(
+          const TaskFilter(dueDateFilter: DueDateFilter.today),
+          now: now,
+        );
+        expect(today.map((t) => t.title).toSet(), {'Earlier today', 'Later today'});
+      });
+
+      test('date filter "this week" spans Monday through Sunday', () async {
+        // 2026-06-15 is a Monday.
+        await taskRepository.createTask(title: 'Monday', dueDate: DateTime(2026, 6, 15));
+        await taskRepository.createTask(title: 'Sunday', dueDate: DateTime(2026, 6, 21, 23, 59));
+        await taskRepository.createTask(title: 'Next Monday', dueDate: DateTime(2026, 6, 22));
+
+        final thisWeek = await taskRepository.getFilteredTasks(
+          const TaskFilter(dueDateFilter: DueDateFilter.thisWeek),
+          now: now,
+        );
+        expect(thisWeek.map((t) => t.title).toSet(), {'Monday', 'Sunday'});
+      });
+
+      test('date filter "no due date" matches only tasks with no due date', () async {
+        await taskRepository.createTask(title: 'Has a date', dueDate: now);
+        await taskRepository.createTask(title: 'No date at all');
+
+        final noDate = await taskRepository.getFilteredTasks(
+          const TaskFilter(dueDateFilter: DueDateFilter.noDueDate),
+          now: now,
+        );
+        expect(noDate, hasLength(1));
+        expect(noDate.single.title, 'No date at all');
+      });
+
+      test('combining category, priority, and tag filters ANDs them together', () async {
+        final categories = await categoryRepository.getAllCategories();
+        final work = categories.firstWhere((c) => c.name == 'Work');
+        final urgentTag = await tagRepository.createTag(name: 'urgent-tag');
+
+        final match = await taskRepository.createTask(
+          title: 'Matches everything',
+          categoryId: work.id,
+          priority: TaskPriority.high,
+          tagIds: [urgentTag.id!],
+        );
+        await taskRepository.createTask(
+          title: 'Wrong priority',
+          categoryId: work.id,
+          priority: TaskPriority.low,
+          tagIds: [urgentTag.id!],
+        );
+        await taskRepository.createTask(
+          title: 'Wrong category',
+          priority: TaskPriority.high,
+          tagIds: [urgentTag.id!],
+        );
+
+        final results = await taskRepository.getFilteredTasks(
+          TaskFilter(categoryId: work.id, priority: TaskPriority.high, tagId: urgentTag.id),
+          now: now,
+        );
+        expect(results.map((t) => t.id), [match.id]);
+      });
+    });
+  });
+
+  group('sorting', () {
+    test('sorting alphabetically respects ascending/descending direction', () async {
+      await taskRepository.createTask(title: 'Banana');
+      await taskRepository.createTask(title: 'apple');
+      await taskRepository.createTask(title: 'Cherry');
+
+      final ascending = await taskRepository.getAllTasks(sortBy: TaskSortOption.alphabetical);
+      expect(ascending.map((t) => t.title).toList(), ['apple', 'Banana', 'Cherry']);
+
+      final descending = await taskRepository.getAllTasks(
+        sortBy: TaskSortOption.alphabetical,
+        ascending: false,
+      );
+      expect(descending.map((t) => t.title).toList(), ['Cherry', 'Banana', 'apple']);
+    });
+
+    test('sorting by priority respects ascending/descending direction', () async {
+      await taskRepository.createTask(title: 'Low', priority: TaskPriority.low);
+      await taskRepository.createTask(title: 'Urgent', priority: TaskPriority.urgent);
+      await taskRepository.createTask(title: 'Medium', priority: TaskPriority.medium);
+
+      final ascending = await taskRepository.getAllTasks(sortBy: TaskSortOption.priority);
+      expect(ascending.map((t) => t.title).toList(), ['Low', 'Medium', 'Urgent']);
+
+      final descending = await taskRepository.getAllTasks(
+        sortBy: TaskSortOption.priority,
+        ascending: false,
+      );
+      expect(descending.map((t) => t.title).toList(), ['Urgent', 'Medium', 'Low']);
+    });
+
+    test('sorting by due date puts tasks with no due date last, regardless of direction', () async {
+      await taskRepository.createTask(title: 'No date');
+      await taskRepository.createTask(title: 'Later', dueDate: DateTime(2026, 6, 20));
+      await taskRepository.createTask(title: 'Earlier', dueDate: DateTime(2026, 6, 10));
+
+      final ascending = await taskRepository.getAllTasks(sortBy: TaskSortOption.dueDate);
+      expect(ascending.map((t) => t.title).toList(), ['Earlier', 'Later', 'No date']);
+
+      final descending = await taskRepository.getAllTasks(
+        sortBy: TaskSortOption.dueDate,
+        ascending: false,
+      );
+      expect(descending.map((t) => t.title).toList(), ['Later', 'Earlier', 'No date']);
+    });
+
+    test('pinned tasks always sort first regardless of the chosen sort option', () async {
+      await taskRepository.createTask(title: 'Zebra', priority: TaskPriority.urgent);
+      await taskRepository.createTask(
+        title: 'Aardvark, but pinned',
+        priority: TaskPriority.low,
+        isPinned: true,
+      );
+
+      final byPriority = await taskRepository.getAllTasks(
+        sortBy: TaskSortOption.priority,
+        ascending: false,
+      );
+      expect(byPriority.first.title, 'Aardvark, but pinned');
     });
   });
 }

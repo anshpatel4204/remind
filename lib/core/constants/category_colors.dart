@@ -13,3 +13,17 @@ const Map<String, Color> kDefaultCategoryColors = {
   'Health': Color(0xFFE63946),
   'Other': Color(0xFF6C757D),
 };
+
+/// A small, fixed palette offered when picking a category's color, kept in
+/// sync with the hex equivalents of [kDefaultCategoryColors] plus a couple
+/// of extras, so custom categories can look at home next to the defaults.
+const List<String> kCategoryColorSwatches = [
+  '#5338FC',
+  '#2E86AB',
+  '#06A77D',
+  '#C77DFF',
+  '#F77F00',
+  '#E63946',
+  '#118AB2',
+  '#6C757D',
+];
