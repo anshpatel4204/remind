@@ -1,4 +1,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Local (offline) notification scheduling - see lib/services/notification/.
+         No network permission is requested anywhere in this app. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- USE_EXACT_ALARM (not SCHEDULE_EXACT_ALARM): REmind's core function is
+         scheduled reminders, which is exactly the category Android reserves
+         this permission for - it is granted automatically at install time,
+         with no extra user-facing settings screen needed. The app still
+         defends itself at runtime (see NotificationService) in case a
+         device/OS variant restricts it anyway. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
     <application
         android:label="REmind"
         android:name="${applicationName}"
@@ -22,5 +35,30 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- flutter_local_notifications: fires a scheduled notification via
+             AlarmManager, even if the app process has been killed. -->
+        <receiver
+            android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
+        <!-- flutter_local_notifications: natively restores every scheduled
+             notification (from its own persisted storage) after the device
+             reboots or the app is updated - no Dart code runs for this. -->
+        <receiver
+            android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+        <!-- flutter_local_notifications: delivers a notification action tap
+             (Complete/Snooze/Dismiss) to the app's background handler even
+             when the app process has been killed. -->
+        <receiver
+            android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
     </application>
 </manifest>

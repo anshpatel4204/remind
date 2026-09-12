@@ -1,3 +1,5 @@
+import '../../services/notification/notification_scheduler.dart';
+import '../../services/notification/notification_transport.dart';
 import '../../services/reminder/reminder_engine.dart';
 import '../database/app_database.dart';
 import '../datasources/category_data_source.dart';
@@ -19,12 +21,29 @@ import 'task_repository.dart';
 /// shared across the widget tree so every screen talks to the same
 /// underlying SQLite connection through the same repository objects.
 class AppRepositories {
-  factory AppRepositories({AppDatabase? appDatabase}) {
+  /// [notificationTransport] must always be passed explicitly - there is
+  /// deliberately no default here. Production code passes a real
+  /// [NotificationService][1]; anything else (tests, or a screen that has
+  /// no interest in real notifications) passes [NoopNotificationTransport]
+  /// or a test fake. That keeps it impossible to *accidentally* end up
+  /// talking to a real platform channel from a test, or a no-op from
+  /// production.
+  ///
+  /// [1]: ../../services/notification/notification_service.dart
+  factory AppRepositories({
+    AppDatabase? appDatabase,
+    required NotificationTransport notificationTransport,
+  }) {
     final db = appDatabase ?? AppDatabase.instance;
     final taskTagDataSource = TaskTagDataSource(db);
     final taskRepository = TaskRepository(TaskDataSource(db), taskTagDataSource);
     final reminderRepository = ReminderRepository(ReminderDataSource(db));
     final recurrenceRepository = RecurrenceRepository(RecurrenceRuleDataSource(db));
+    final reminderEngine = ReminderEngine(
+      taskRepository: taskRepository,
+      reminderRepository: reminderRepository,
+      recurrenceRepository: recurrenceRepository,
+    );
     return AppRepositories._(
       taskRepository: taskRepository,
       reminderRepository: reminderRepository,
@@ -32,10 +51,12 @@ class AppRepositories {
       tagRepository: TagRepository(TagDataSource(db), taskTagDataSource),
       settingsRepository: SettingsRepository(SettingsDataSource(db)),
       recurrenceRepository: recurrenceRepository,
-      reminderEngine: ReminderEngine(
+      reminderEngine: reminderEngine,
+      notificationScheduler: NotificationScheduler(
+        transport: notificationTransport,
         taskRepository: taskRepository,
         reminderRepository: reminderRepository,
-        recurrenceRepository: recurrenceRepository,
+        reminderEngine: reminderEngine,
       ),
     );
   }
@@ -48,6 +69,7 @@ class AppRepositories {
     required this.settingsRepository,
     required this.recurrenceRepository,
     required this.reminderEngine,
+    required this.notificationScheduler,
   });
 
   final TaskRepository taskRepository;
@@ -61,4 +83,12 @@ class AppRepositories {
   /// itself for what it does and doesn't do). Screens should call this
   /// rather than re-implementing any scheduling decision themselves.
   final ReminderEngine reminderEngine;
+
+  /// Connects [reminderEngine]'s decisions to an actual platform
+  /// notification (see [NotificationScheduler] itself for the full
+  /// architecture). Screens should call this - never
+  /// [NotificationTransport] or `reminderRepository` - for anything that
+  /// creates, changes, or removes a reminder, so a reminder row is never
+  /// left without a matching scheduled notification, or vice versa.
+  final NotificationScheduler notificationScheduler;
 }

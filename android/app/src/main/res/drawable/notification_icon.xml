@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  flutter_local_notifications requires a drawable resource for its status-bar
+  icon (AndroidInitializationSettings takes a drawable name, not a mipmap
+  name). The app has no dedicated monochrome notification icon yet, so this
+  aliases the existing launcher mipmap into a drawable resource rather than
+  failing to initialize at app startup - see notification_service.dart.
+-->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@mipmap/ic_launcher" />

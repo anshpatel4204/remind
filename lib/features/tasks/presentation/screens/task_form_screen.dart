@@ -258,17 +258,26 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
 
       await repos.taskRepository.setTagsForTask(task.id!, _selectedTagIds.toList());
 
+      // Routed through notificationScheduler (never reminderRepository
+      // directly) so setting/changing/removing a reminder here always
+      // keeps its actual scheduled Android notification in sync - see
+      // NotificationScheduler for why that matters (duplicate
+      // prevention, cancel-before-reschedule, etc).
       final reminderTime = _combinedReminderDateTime;
       if (_reminderEnabled && reminderTime != null) {
         if (_existingReminder == null) {
-          await repos.reminderRepository.createReminder(taskId: task.id!, reminderTime: reminderTime);
+          await repos.notificationScheduler.createAndScheduleReminder(
+            taskId: task.id!,
+            reminderTime: reminderTime,
+          );
         } else {
-          await repos.reminderRepository.updateReminder(
-            _existingReminder!.copyWith(reminderTime: reminderTime, isEnabled: true),
+          await repos.notificationScheduler.updateAndRescheduleReminder(
+            _existingReminder!.id!,
+            reminderTime,
           );
         }
       } else if (_existingReminder != null) {
-        await repos.reminderRepository.deleteReminder(_existingReminder!.id!);
+        await repos.notificationScheduler.deleteReminder(_existingReminder!.id!);
       }
 
       if (!mounted) return;

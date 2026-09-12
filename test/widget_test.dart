@@ -7,6 +7,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:remind/data/database/app_database.dart';
 import 'package:remind/data/repositories/app_repositories.dart';
+import 'package:remind/services/notification/notification_transport.dart';
 import 'package:remind/main.dart';
 
 void main() {
@@ -23,7 +24,10 @@ void main() {
     tempDir = Directory.systemTemp.createTempSync('remind_widget_test_');
     final path = p.join(tempDir.path, 'widget_test.db');
     appDatabase = AppDatabase(testDatabasePath: path);
-    repositories = AppRepositories(appDatabase: appDatabase);
+    repositories = AppRepositories(
+      appDatabase: appDatabase,
+      notificationTransport: const NoopNotificationTransport(),
+    );
   });
 
   tearDown(() async {

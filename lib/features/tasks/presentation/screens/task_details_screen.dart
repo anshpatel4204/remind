@@ -65,7 +65,11 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   }
 
   Future<void> _complete(TaskModel task) async {
-    await RepositoryScope.of(context).taskRepository.completeTask(task.id!);
+    // Goes through notificationScheduler (not taskRepository directly) so
+    // the task's reminder notification(s) are cancelled - and, for a
+    // recurring task, rescheduled for the next occurrence - rather than
+    // firing again for a task that's already done.
+    await RepositoryScope.of(context).notificationScheduler.completeTask(task.id!);
     _reload();
   }
 
@@ -101,7 +105,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     );
     if (confirmed != true) return;
     if (!mounted) return;
-    await RepositoryScope.of(context).taskRepository.deleteTask(task.id!);
+    final repos = RepositoryScope.of(context);
+    await repos.notificationScheduler.cancelNotificationsForTask(task.id!);
+    await repos.taskRepository.deleteTask(task.id!);
     if (!mounted) return;
     Navigator.of(context).pop();
   }

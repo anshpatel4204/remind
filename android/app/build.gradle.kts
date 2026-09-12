@@ -12,6 +12,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // Required by flutter_local_notifications: it uses java.time APIs
+        // under the hood, which need desugaring to run on the app's minSdk.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -24,6 +27,9 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // flutter_local_notifications + its dependencies push the app past
+        // the 64k-method dex limit on lower API levels.
+        multiDexEnabled = true
     }
 
     buildTypes {
@@ -36,4 +42,8 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

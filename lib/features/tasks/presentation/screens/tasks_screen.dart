@@ -93,7 +93,11 @@ class _TasksScreenState extends State<TasksScreen> {
     if (task.status == TaskStatus.completed) {
       await repos.taskRepository.reopenTask(task.id!);
     } else {
-      await repos.taskRepository.completeTask(task.id!);
+      // Goes through notificationScheduler (not taskRepository directly)
+      // so the task's reminder notification(s) are cancelled - and, for a
+      // recurring task, rescheduled for the next occurrence - rather than
+      // firing again for a task that's already done.
+      await repos.notificationScheduler.completeTask(task.id!);
     }
     _reload();
   }
@@ -123,7 +127,9 @@ class _TasksScreenState extends State<TasksScreen> {
     );
     if (confirmed != true) return;
     if (!mounted) return;
-    await RepositoryScope.of(context).taskRepository.deleteTask(task.id!);
+    final repos = RepositoryScope.of(context);
+    await repos.notificationScheduler.cancelNotificationsForTask(task.id!);
+    await repos.taskRepository.deleteTask(task.id!);
     if (!mounted) return;
     _reload();
   }
