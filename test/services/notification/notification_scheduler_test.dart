@@ -398,6 +398,60 @@ void main() {
       expect(transport.scheduled.containsKey(reminder.id), isFalse);
     });
 
+    test('a recurring reminder missed for days catches up to the next future '
+        'occurrence and schedules that instead of every missed one', () async {
+      final rule = await recurrenceRepository.createRule(
+        frequency: RecurrenceFrequency.daily,
+        startDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      final task = await taskRepository.createTask(
+        title: 'Take medicine',
+        recurrenceRuleId: rule.id,
+        dueDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      final reminder = await reminderRepository.createReminder(
+        taskId: task.id!,
+        reminderTime: DateTime(2026, 1, 1, 8, 0),
+      );
+
+      // Inactive from Jan 1st through Jan 6th - never restarted, never
+      // scheduled, five daily occurrences missed.
+      await scheduler.reconcileAfterStartup(now: DateTime(2026, 1, 6, 12, 0));
+
+      // Exactly one notification is scheduled - for the next valid future
+      // occurrence, not a backlog of the missed ones.
+      expect(transport.scheduled.length, 1);
+      final scheduled = transport.scheduled[reminder.id]!;
+      expect(scheduled.scheduledTime, DateTime(2026, 1, 7, 8, 0));
+
+      final persistedTask = await taskRepository.getTask(task.id!);
+      expect(persistedTask?.dueDate, DateTime(2026, 1, 7, 8, 0));
+    });
+
+    test('a recurring reminder whose recurrence ended during the missed time '
+        'is disabled rather than left stuck in the past', () async {
+      final rule = await recurrenceRepository.createRule(
+        frequency: RecurrenceFrequency.daily,
+        startDate: DateTime(2026, 1, 1, 8, 0),
+        endDate: DateTime(2026, 1, 3, 8, 0),
+      );
+      final task = await taskRepository.createTask(
+        title: 'Short course of medicine',
+        recurrenceRuleId: rule.id,
+        dueDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      final reminder = await reminderRepository.createReminder(
+        taskId: task.id!,
+        reminderTime: DateTime(2026, 1, 1, 8, 0),
+      );
+
+      await scheduler.reconcileAfterStartup(now: DateTime(2026, 1, 10, 0, 0));
+
+      expect(transport.scheduled, isEmpty);
+      final persistedReminder = await reminderRepository.getReminder(reminder.id!);
+      expect(persistedReminder?.isEnabled, isFalse);
+    });
+
     test('cancels a stray pending notification with no matching enabled reminder', () async {
       // Nothing in the database corresponds to this id - as if a reminder
       // had been deleted by some path that didn't go through the

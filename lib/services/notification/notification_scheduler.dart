@@ -266,8 +266,11 @@ class NotificationScheduler {
   }
 
   /// Re-establishes every enabled, still-future reminder's scheduled
-  /// notification, and cancels any stray platform notification that no
-  /// longer matches an enabled reminder.
+  /// notification, catches up any enabled reminder whose time has
+  /// already passed to its recurring task's next valid future occurrence
+  /// (see [ReminderEngine.catchUpMissedOccurrence]), and cancels any
+  /// stray platform notification that no longer matches an enabled
+  /// reminder.
   ///
   /// The Android boot receiver (see AndroidManifest.xml) already restores
   /// scheduled notifications natively after a device reboot without any
@@ -289,9 +292,18 @@ class NotificationScheduler {
 
       final fireTime = reminder.snoozedUntil ?? reminder.reminderTime;
       if (!fireTime.isAfter(effectiveNow)) {
-        // Already in the past (e.g. the app was closed for days) - leave
-        // it as-is rather than silently firing a notification for a
-        // moment that has already gone by.
+        // Already in the past (e.g. the app was closed for days, or a
+        // snooze expired unattended). For a recurring task, jump straight
+        // to the next still-future occurrence instead of leaving it stuck
+        // in the past forever or queuing a notification for every
+        // occurrence missed in between - see
+        // ReminderEngine.catchUpMissedOccurrence. A non-recurring
+        // reminder has no schedule to catch up to, so it is simply left
+        // as a single overdue reminder, exactly as before.
+        final caughtUp = await _reminderEngine.catchUpMissedOccurrence(id, now: effectiveNow);
+        if (caughtUp != null) {
+          await _scheduleNotificationFor(caughtUp, exactOverride: exact);
+        }
         continue;
       }
       if (!pendingIds.contains(id)) {

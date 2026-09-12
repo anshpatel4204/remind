@@ -152,6 +152,71 @@ class ReminderEngine {
     return updatedTask;
   }
 
+  /// Called at startup (or wherever a reminder's stored fire time may
+  /// have already passed without ever being handled - the app was
+  /// closed, or the device was off, through one or more of the task's
+  /// own recurrence occurrences) for the reminder identified by
+  /// [reminderId].
+  ///
+  /// For a reminder attached to a recurring task, this rolls the task's
+  /// due date forward - and every one of its reminders by that same
+  /// elapsed shift, exactly like [handleCompletedRecurringTask] - to the
+  /// first occurrence that is still strictly after [now]. This is a
+  /// single jump directly to the next valid occurrence, never a step
+  /// through each missed one in between: a task whose daily 8am reminder
+  /// was missed for a week produces one catch-up jump to today, not
+  /// seven queued reminders (and never a duplicate row for any
+  /// occurrence in between - the same task/reminder rows just advance).
+  ///
+  /// If the recurrence has already ended before reaching a future
+  /// occurrence, there is nothing left to schedule: the reminder is
+  /// disabled (rather than left enabled with a stale past time forever)
+  /// and this returns null.
+  ///
+  /// For a reminder whose task is not recurring (or has no due date),
+  /// there is no schedule to catch up to - it is simply an overdue
+  /// one-off reminder - so this does nothing and returns null.
+  Future<ReminderModel?> catchUpMissedOccurrence(int reminderId, {DateTime? now}) async {
+    final reminder = await _reminderRepository.getReminder(reminderId);
+    if (reminder == null) return null;
+
+    final task = await _taskRepository.getTask(reminder.taskId);
+    if (task == null) return null;
+
+    final recurrenceRuleId = task.recurrenceRuleId;
+    final oldDueDate = task.dueDate;
+    if (recurrenceRuleId == null || oldDueDate == null) return null;
+
+    final rule = await _recurrenceRepository.getRule(recurrenceRuleId);
+    if (rule == null) return null;
+
+    final effectiveNow = now ?? DateTime.now();
+    final next = RecurrenceCalculator.nextOccurrence(rule, after: effectiveNow);
+    if (next == null) {
+      // The recurrence ended somewhere during the missed time - nothing
+      // left to catch up to; stop scheduling it for good.
+      await _reminderRepository.updateReminder(reminder.copyWith(isEnabled: false));
+      return null;
+    }
+
+    final shift = next.difference(oldDueDate);
+    final updatedTask = task.copyWith(dueDate: next, updatedAt: effectiveNow);
+    await _taskRepository.updateTask(updatedTask);
+
+    final reminders = await _reminderRepository.getRemindersForTask(task.id!);
+    ReminderModel? caughtUpTarget;
+    for (final taskReminder in reminders) {
+      final updated = taskReminder.copyWith(
+        reminderTime: taskReminder.reminderTime.add(shift),
+        isEnabled: true,
+        clearSnooze: true,
+      );
+      await _reminderRepository.updateReminder(updated);
+      if (taskReminder.id == reminderId) caughtUpTarget = updated;
+    }
+    return caughtUpTarget;
+  }
+
   /// Snoozes [reminderId] for [snoozeMinutes] minutes starting from [now]
   /// (defaulting to the current device time). Returns the updated
   /// reminder, or null if it no longer exists.
