@@ -14,7 +14,11 @@ class DbConfig {
   /// installed base on version 1 - Part 1 shipped no database at all - so
   /// this lets us prove the migration mechanism works correctly *before* a
   /// real future schema change ever needs it.
-  static const int databaseVersion = 2;
+  ///
+  /// Version 3 adds `recurrence_rules.custom_unit`, needed so a "custom"
+  /// recurrence rule can record whether its intervalValue counts in days,
+  /// weeks, months, or years (see [RecurrenceCustomUnit] in enums.dart).
+  static const int databaseVersion = 3;
 }
 
 class CategoriesTable {
@@ -45,6 +49,10 @@ class RecurrenceRulesTable {
   static const String endDate = 'end_date';
   static const String occurrencesCount = 'occurrences_count';
   static const String createdAt = 'created_at';
+
+  /// Added in schema v3. Only meaningful when [frequency] is `custom`;
+  /// null for every other frequency.
+  static const String customUnit = 'custom_unit';
 }
 
 class TasksTable {

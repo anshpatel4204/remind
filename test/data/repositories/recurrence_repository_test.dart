@@ -38,4 +38,101 @@ void main() {
     await repository.deleteRule(created.id!);
     expect(await repository.getRule(created.id!), isNull);
   });
+
+  test('round-trips a custom rule and its customUnit', () async {
+    final created = await repository.createRule(
+      frequency: RecurrenceFrequency.custom,
+      intervalValue: 3,
+      customUnit: RecurrenceCustomUnit.weeks,
+      startDate: DateTime(2026, 1, 1),
+    );
+
+    final fetched = await repository.getRule(created.id!);
+    expect(fetched?.frequency, RecurrenceFrequency.custom);
+    expect(fetched?.intervalValue, 3);
+    expect(fetched?.customUnit, RecurrenceCustomUnit.weeks);
+
+    // Round-trip through an update too, so a rewritten customUnit is
+    // actually persisted and not silently dropped.
+    await repository.updateRule(fetched!.copyWith(customUnit: RecurrenceCustomUnit.months));
+    final updated = await repository.getRule(created.id!);
+    expect(updated?.customUnit, RecurrenceCustomUnit.months);
+  });
+
+  group('invalid recurrence rejection', () {
+    test('rejects an intervalValue below 1', () {
+      expect(
+        () => repository.createRule(
+          frequency: RecurrenceFrequency.daily,
+          intervalValue: 0,
+          startDate: DateTime(2026, 1, 1),
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('rejects a weekly rule with no days of week selected', () {
+      expect(
+        () => repository.createRule(
+          frequency: RecurrenceFrequency.weekly,
+          startDate: DateTime(2026, 1, 1),
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('rejects a weekly rule with an out-of-range day of week', () {
+      expect(
+        () => repository.createRule(
+          frequency: RecurrenceFrequency.weekly,
+          daysOfWeek: [0, 8],
+          startDate: DateTime(2026, 1, 1),
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('rejects a custom rule with no customUnit', () {
+      expect(
+        () => repository.createRule(
+          frequency: RecurrenceFrequency.custom,
+          startDate: DateTime(2026, 1, 1),
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('rejects an endDate before startDate', () {
+      expect(
+        () => repository.createRule(
+          frequency: RecurrenceFrequency.daily,
+          startDate: DateTime(2026, 1, 10),
+          endDate: DateTime(2026, 1, 1),
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('rejects an occurrencesCount below 1', () {
+      expect(
+        () => repository.createRule(
+          frequency: RecurrenceFrequency.daily,
+          startDate: DateTime(2026, 1, 1),
+          occurrencesCount: 0,
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('also validates on updateRule, not just createRule', () async {
+      final created = await repository.createRule(
+        frequency: RecurrenceFrequency.daily,
+        startDate: DateTime(2026, 1, 1),
+      );
+      expect(
+        () => repository.updateRule(created.copyWith(intervalValue: -1)),
+        throwsArgumentError,
+      );
+    });
+  });
 }

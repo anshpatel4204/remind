@@ -47,3 +47,18 @@ enum RecurrenceFrequency {
 
   static RecurrenceFrequency fromDbValue(int value) => RecurrenceFrequency.values[value];
 }
+
+/// The unit that a [RecurrenceFrequency.custom] rule's `intervalValue`
+/// counts in (e.g. "every 3 days" vs "every 3 months"), stored in SQLite
+/// as a plain integer. Only meaningful when a rule's frequency is
+/// [RecurrenceFrequency.custom].
+enum RecurrenceCustomUnit {
+  days,
+  weeks,
+  months,
+  years;
+
+  int get dbValue => index;
+
+  static RecurrenceCustomUnit fromDbValue(int value) => RecurrenceCustomUnit.values[value];
+}

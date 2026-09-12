@@ -1,3 +1,4 @@
+import '../../services/reminder/reminder_engine.dart';
 import '../database/app_database.dart';
 import '../datasources/category_data_source.dart';
 import '../datasources/recurrence_rule_data_source.dart';
@@ -21,13 +22,21 @@ class AppRepositories {
   factory AppRepositories({AppDatabase? appDatabase}) {
     final db = appDatabase ?? AppDatabase.instance;
     final taskTagDataSource = TaskTagDataSource(db);
+    final taskRepository = TaskRepository(TaskDataSource(db), taskTagDataSource);
+    final reminderRepository = ReminderRepository(ReminderDataSource(db));
+    final recurrenceRepository = RecurrenceRepository(RecurrenceRuleDataSource(db));
     return AppRepositories._(
-      taskRepository: TaskRepository(TaskDataSource(db), taskTagDataSource),
-      reminderRepository: ReminderRepository(ReminderDataSource(db)),
+      taskRepository: taskRepository,
+      reminderRepository: reminderRepository,
       categoryRepository: CategoryRepository(CategoryDataSource(db)),
       tagRepository: TagRepository(TagDataSource(db), taskTagDataSource),
       settingsRepository: SettingsRepository(SettingsDataSource(db)),
-      recurrenceRepository: RecurrenceRepository(RecurrenceRuleDataSource(db)),
+      recurrenceRepository: recurrenceRepository,
+      reminderEngine: ReminderEngine(
+        taskRepository: taskRepository,
+        reminderRepository: reminderRepository,
+        recurrenceRepository: recurrenceRepository,
+      ),
     );
   }
 
@@ -38,6 +47,7 @@ class AppRepositories {
     required this.tagRepository,
     required this.settingsRepository,
     required this.recurrenceRepository,
+    required this.reminderEngine,
   });
 
   final TaskRepository taskRepository;
@@ -46,4 +56,9 @@ class AppRepositories {
   final TagRepository tagRepository;
   final SettingsRepository settingsRepository;
   final RecurrenceRepository recurrenceRepository;
+
+  /// Dedicated recurrence/reminder scheduling logic (see [ReminderEngine]
+  /// itself for what it does and doesn't do). Screens should call this
+  /// rather than re-implementing any scheduling decision themselves.
+  final ReminderEngine reminderEngine;
 }

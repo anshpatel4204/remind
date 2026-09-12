@@ -116,3 +116,48 @@ CREATE TABLE ${SettingsTable.name} (
     createSettings,
   ];
 }
+
+/// SQL statements for schema version 3.
+///
+/// The only change from [SchemaV2] is that `recurrence_rules` gains a
+/// `custom_unit` column (see [RecurrenceRulesTable.customUnit]). Every
+/// other table is byte-for-byte identical, so this class deliberately
+/// reuses [SchemaV2]'s constants for them rather than redeclaring the SQL
+/// - that keeps [SchemaV2] itself frozen/historical (still needed as-is by
+/// the existing v1 -> v2 upgrade path) and means an unchanged table's SQL
+/// only ever has to be correct in one place.
+class SchemaV3 {
+  static const String createCategories = SchemaV2.createCategories;
+  static const String createTags = SchemaV2.createTags;
+
+  static const String createRecurrenceRules = '''
+CREATE TABLE ${RecurrenceRulesTable.name} (
+  ${RecurrenceRulesTable.id} INTEGER PRIMARY KEY AUTOINCREMENT,
+  ${RecurrenceRulesTable.frequency} INTEGER NOT NULL,
+  ${RecurrenceRulesTable.intervalValue} INTEGER NOT NULL DEFAULT 1,
+  ${RecurrenceRulesTable.daysOfWeek} TEXT,
+  ${RecurrenceRulesTable.startDate} INTEGER NOT NULL,
+  ${RecurrenceRulesTable.endDate} INTEGER,
+  ${RecurrenceRulesTable.occurrencesCount} INTEGER,
+  ${RecurrenceRulesTable.createdAt} INTEGER NOT NULL,
+  ${RecurrenceRulesTable.customUnit} INTEGER
+)
+''';
+
+  static const String createTasks = SchemaV2.createTasks;
+  static const String createTaskTags = SchemaV2.createTaskTags;
+  static const String createReminders = SchemaV2.createReminders;
+  static const String createSettings = SchemaV2.createSettings;
+
+  static const List<String> createIndexes = SchemaV2.createIndexes;
+
+  static const List<String> createAllTables = [
+    createCategories,
+    createTags,
+    createRecurrenceRules,
+    createTasks,
+    createTaskTags,
+    createReminders,
+    createSettings,
+  ];
+}

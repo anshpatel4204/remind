@@ -8,6 +8,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:remind/data/database/app_database.dart';
 import 'package:remind/data/database/db_constants.dart';
 import 'package:remind/data/database/legacy_schema_v1.dart';
+import 'package:remind/data/database/schema.dart';
 
 import '../../test_helpers/test_database_factory.dart';
 
@@ -131,6 +132,78 @@ void main() {
 
       await appDatabase.close();
       dir.deleteSync(recursive: true);
+    });
+  });
+
+  group('schema migration v2 -> v3', () {
+    test('adds custom_unit to recurrence_rules and preserves existing rows', () async {
+      final dir = Directory.systemTemp.createTempSync('remind_migration_v2_v3_test_');
+      final path = p.join(dir.path, 'migration_v2_v3_test.db');
+
+      // Simulate a device that already has a "version 2" database on disk
+      // (the schema shipped before this part), with one pre-existing
+      // recurrence rule that of course predates the custom_unit column.
+      final legacyDb = await databaseFactory.openDatabase(
+        path,
+        options: OpenDatabaseOptions(
+          version: 2,
+          onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
+          onCreate: (db, version) async {
+            for (final statement in SchemaV2.createAllTables) {
+              await db.execute(statement);
+            }
+            for (final statement in SchemaV2.createIndexes) {
+              await db.execute(statement);
+            }
+          },
+        ),
+      );
+      final preExistingRuleId = await legacyDb.insert(RecurrenceRulesTable.name, {
+        RecurrenceRulesTable.frequency: 1, // weekly
+        RecurrenceRulesTable.intervalValue: 1,
+        RecurrenceRulesTable.daysOfWeek: '1,3,5',
+        RecurrenceRulesTable.startDate: DateTime(2026, 1, 1).millisecondsSinceEpoch,
+        RecurrenceRulesTable.createdAt: DateTime(2026, 1, 1).millisecondsSinceEpoch,
+      });
+      await legacyDb.close();
+
+      // Now open the same file through AppDatabase (version 3). This must
+      // trigger onUpgrade's v2 -> v3 step rather than onCreate, and must
+      // not lose the pre-existing rule.
+      final appDatabase = AppDatabase(testDatabasePath: path);
+      final db = await appDatabase.database;
+
+      final columns = await db.rawQuery(
+        "PRAGMA table_info(${RecurrenceRulesTable.name})",
+      );
+      final columnNames = columns.map((c) => c['name'] as String).toSet();
+      expect(columnNames.contains(RecurrenceRulesTable.customUnit), isTrue);
+
+      final rules = await db.query(RecurrenceRulesTable.name);
+      expect(rules, hasLength(1));
+      expect(rules.first[RecurrenceRulesTable.id], preExistingRuleId);
+      expect(rules.first[RecurrenceRulesTable.daysOfWeek], '1,3,5');
+      // A column added by ALTER TABLE has no historical value to backfill
+      // for a pre-existing row - it must come back null, which is exactly
+      // what RecurrenceRuleModel.fromMap already treats as "no custom
+      // unit".
+      expect(rules.first[RecurrenceRulesTable.customUnit], isNull);
+
+      await appDatabase.close();
+      dir.deleteSync(recursive: true);
+    });
+
+    test('a fresh install at the current version already has custom_unit', () async {
+      final testDb = TestAppDatabase.create();
+      final db = await testDb.appDatabase.database;
+
+      final columns = await db.rawQuery(
+        "PRAGMA table_info(${RecurrenceRulesTable.name})",
+      );
+      final columnNames = columns.map((c) => c['name'] as String).toSet();
+      expect(columnNames.contains(RecurrenceRulesTable.customUnit), isTrue);
+
+      await testDb.tearDown();
     });
   });
 }

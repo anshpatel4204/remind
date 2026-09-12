@@ -74,6 +74,10 @@ class ReminderModel {
     bool? isEnabled,
     int? snoozeMinutes,
     DateTime? snoozedUntil,
+    /// Clears [snoozeMinutes] and [snoozedUntil] together - a reminder is
+    /// never meaningfully "half snoozed", so these two always change as a
+    /// pair rather than needing separate clear flags.
+    bool clearSnooze = false,
     int? notificationId,
     DateTime? createdAt,
   }) {
@@ -83,8 +87,8 @@ class ReminderModel {
       reminderTime: reminderTime ?? this.reminderTime,
       reminderType: reminderType ?? this.reminderType,
       isEnabled: isEnabled ?? this.isEnabled,
-      snoozeMinutes: snoozeMinutes ?? this.snoozeMinutes,
-      snoozedUntil: snoozedUntil ?? this.snoozedUntil,
+      snoozeMinutes: clearSnooze ? null : (snoozeMinutes ?? this.snoozeMinutes),
+      snoozedUntil: clearSnooze ? null : (snoozedUntil ?? this.snoozedUntil),
       notificationId: notificationId ?? this.notificationId,
       createdAt: createdAt ?? this.createdAt,
     );

@@ -45,10 +45,10 @@ class AppDatabase {
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    for (final statement in SchemaV2.createAllTables) {
+    for (final statement in SchemaV3.createAllTables) {
       await db.execute(statement);
     }
-    for (final statement in SchemaV2.createIndexes) {
+    for (final statement in SchemaV3.createIndexes) {
       await db.execute(statement);
     }
     await _seedDefaultCategories(db);
@@ -57,6 +57,9 @@ class AppDatabase {
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await _upgradeV1ToV2(db);
+    }
+    if (oldVersion < 3) {
+      await _upgradeV2ToV3(db);
     }
     // Future schema changes append another `if (oldVersion < N)` step here.
     // Each step is additive and migrates data before dropping anything, so
@@ -96,6 +99,20 @@ FROM tasks_old_v1
 
     await db.execute('DROP TABLE tasks_old_v1');
     await _seedDefaultCategories(db);
+  }
+
+  /// Adds the `custom_unit` column introduced in schema v3. Deliberately
+  /// only touches `recurrence_rules` - every other v2 table is unchanged
+  /// in v3, so nothing else needs migrating. Existing rows get `NULL`
+  /// (SQLite's default for a newly added column with no explicit
+  /// default), which is exactly correct: no pre-v3 rule can have been a
+  /// "custom" rule with a unit selected, since that concept didn't exist
+  /// yet, and `NULL` is what [RecurrenceRuleModel.fromMap] already
+  /// expects for "no custom unit".
+  Future<void> _upgradeV2ToV3(Database db) async {
+    await db.execute(
+      'ALTER TABLE ${RecurrenceRulesTable.name} ADD COLUMN ${RecurrenceRulesTable.customUnit} INTEGER',
+    );
   }
 
   Future<void> _seedDefaultCategories(Database db) async {
