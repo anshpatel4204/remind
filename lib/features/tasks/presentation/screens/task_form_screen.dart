@@ -6,6 +6,7 @@ import '../../../../data/models/enums.dart';
 import '../../../../data/models/reminder_model.dart';
 import '../../../../data/models/tag_model.dart';
 import '../../../../data/models/task_model.dart';
+import '../../../../presentation/widgets/remind_loading_state.dart';
 import '../../../../presentation/widgets/repository_scope.dart';
 
 /// A single form used for both creating a new task and editing an existing
@@ -300,7 +301,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     if (_loading) {
       return Scaffold(
         appBar: AppBar(title: Text(widget.isEditing ? 'Edit task' : 'Add task')),
-        body: const Center(child: CircularProgressIndicator()),
+        body: const REmindLoadingState(),
       );
     }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/theme_controller.dart';
+import '../../../../presentation/widgets/remind_section_header.dart';
 import '../../../../presentation/widgets/repository_scope.dart';
 
 /// The Settings tab: appearance (theme mode), a read-only notification
@@ -52,7 +53,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         builder: (context, _) {
           return ListView(
             children: [
-              const _SectionLabel('Appearance'),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: REmindSectionHeader(title: 'Appearance', icon: Icons.palette_outlined),
+              ),
               RadioGroup<ThemeMode>(
                 groupValue: themeController.mode,
                 onChanged: (mode) => mode == null ? null : themeController.setMode(mode),
@@ -74,7 +78,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               const Divider(height: 32),
-              const _SectionLabel('Notifications'),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: REmindSectionHeader(title: 'Notifications', icon: Icons.notifications_outlined),
+              ),
               FutureBuilder<_NotificationStatus>(
                 future: _statusFuture,
                 builder: (context, snapshot) {
@@ -142,7 +149,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 },
               ),
               const Divider(height: 32),
-              const _SectionLabel('About'),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: REmindSectionHeader(title: 'About', icon: Icons.info_outline),
+              ),
               ListTile(
                 leading: const Icon(Icons.info_outline),
                 title: const Text('About REmind'),
@@ -179,22 +189,3 @@ class _NotificationStatus {
   final bool exactAlarmsAllowed;
 }
 
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.w600,
-            ),
-      ),
-    );
-  }
-}

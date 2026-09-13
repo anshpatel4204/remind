@@ -7,6 +7,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:remind/data/database/app_database.dart';
 import 'package:remind/data/repositories/app_repositories.dart';
+import 'package:intl/intl.dart';
 import 'package:remind/services/notification/notification_transport.dart';
 import 'package:remind/main.dart';
 
@@ -111,9 +112,132 @@ void main() {
 
     await tester.enterText(find.widgetWithText(TextFormField, 'Title'), 'Buy groceries');
     await tester.tap(find.widgetWithIcon(IconButton, Icons.check));
+
+    // See the Calendar-tab equivalent test for why: the title field we
+    // just typed into still displays this exact text until the form
+    // screen is actually popped, so waiting for the literal string alone
+    // can match instantly, before the real save has finished. Wait for
+    // the Tasks tab's own FAB to reappear first to know we've actually
+    // navigated back.
+    await pumpUntilFound(tester, find.byTooltip('Add task'));
     await pumpUntilFound(tester, find.text('Buy groceries'));
 
     expect(find.text('Buy groceries'), findsOneWidget);
     expect(find.text('No tasks yet'), findsNothing);
+  });
+
+  testWidgets('Calendar shows a Day/Week/Month switcher and navigates between them', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(RemindApp(repositories: repositories));
+    await tester.pump();
+
+    await tester.tap(find.text('Calendar'));
+    await pumpUntilFound(tester, find.text('Month'));
+
+    // Starts in Month view: the weekday header row is visible.
+    expect(find.text('Mon'), findsOneWidget);
+
+    final todayHeader = DateFormat('EEEE, MMM d').format(DateTime.now());
+    await tester.tap(find.text('Day'));
+    await pumpUntilFound(tester, find.text(todayHeader));
+
+    // Day view has no weekday header/grid at all.
+    expect(find.text('Mon'), findsNothing);
+    expect(find.text(todayHeader), findsOneWidget);
+
+    await tester.tap(find.text('Week'));
+    await pumpUntilFound(tester, find.text('Mon'));
+
+    // Week view brings the weekday header back.
+    expect(find.text('Mon'), findsOneWidget);
+  });
+
+  testWidgets('Creating a task from the Calendar tab shows it in that day\'s list', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(RemindApp(repositories: repositories));
+    await tester.pump();
+
+    await tester.tap(find.text('Calendar'));
+    await pumpUntilFound(tester, find.text('Month'));
+
+    await tester.tap(find.byTooltip('Add task').first);
+    await pumpUntilFound(tester, find.widgetWithText(TextFormField, 'Title'));
+
+    await tester.enterText(find.widgetWithText(TextFormField, 'Title'), 'Water the plants');
+    await tester.tap(find.widgetWithIcon(IconButton, Icons.check));
+
+    // Waiting for the literal text "Water the plants" alone is ambiguous:
+    // the title field we just typed into displays that exact same string
+    // right up until the form screen is actually popped, so this can match
+    // instantly - before the real save/insert has even started - letting
+    // the test (and its tearDown, which closes the database) race ahead of
+    // the still in-flight write. Wait for the Calendar tab's own FAB to
+    // reappear first, which only happens once we've actually navigated
+    // back, i.e. the save has genuinely finished.
+    await pumpUntilFound(tester, find.byTooltip('Add task').first);
+    await pumpUntilFound(tester, find.text('Water the plants'));
+
+    // sqflite_common starts an internal "warn if this lock is held for
+    // 10s" diagnostic Timer around every write, purely as a debugging
+    // aid - it is not a sign anything is actually stuck, and normally
+    // fires (or gets cancelled) so quickly in real use that nobody
+    // notices it exists. But every pump() elsewhere in this test only
+    // ever nudges the fake test clock forward by tens or hundreds of
+    // milliseconds, so that 10-second Timer never actually gets to
+    // elapse - it just sits there "pending" until flutter_test's
+    // end-of-test invariant check flags it as a leak. A single big jump
+    // past 10 seconds fires it, but does so instantly from the fake
+    // clock's point of view, without giving the real cross-isolate side
+    // of that same operation any actual time to finish responding -
+    // stepping forward gradually, interleaved with real delays like the
+    // rest of this file's real-database waits, lets both happen the way
+    // they would outside a test.
+    for (var settle = 0; settle < 12; settle++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pump(const Duration(seconds: 1));
+    }
+
+    expect(find.text('Water the plants'), findsOneWidget);
+  });
+
+  testWidgets('Search shows a prompt, then "no results" for a non-matching query', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(RemindApp(repositories: repositories));
+    await tester.pump();
+
+    await tester.tap(find.text('Tasks'));
+    await pumpUntilFound(tester, find.text('No tasks yet'));
+
+    await tester.tap(find.byType(TextField).first);
+    await pumpUntilFound(tester, find.text('Search your tasks'));
+
+    // The Tasks tab's own (read-only) search field is still technically
+    // findable here alongside the Search screen's own field - the pushed
+    // route covers it visually, but both remain matched by a plain
+    // find.byType(TextField), which made ".first" pick whichever the
+    // finder happened to order first rather than reliably the new
+    // screen's field. Target it by key instead, since that field is the
+    // only place a Key('searchScreenField') exists in the tree.
+    await tester.enterText(find.byKey(const Key('searchScreenField')), 'nothing matches this');
+
+    // The search box debounces via a real Timer(250ms) before it fires the
+    // query, and that Timer runs on the fake test clock - pumpUntilFound's
+    // shared loop deliberately pumps with a bare, zero-duration pump() (so
+    // as not to perturb other tests' real cross-isolate database timing),
+    // which never elapses that clock. So this test waits it out itself:
+    // pump WITH a duration each iteration to let the debounce elapse and
+    // fire, interleaved with a real-time delay so the resulting real
+    // database query also gets a chance to actually complete.
+    final noResultsFinder = find.textContaining('No results for');
+    for (var attempt = 0; attempt < 30; attempt++) {
+      if (noResultsFinder.evaluate().isNotEmpty) break;
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
+    expect(find.textContaining('No results for "nothing matches this"'), findsOneWidget);
   });
 }

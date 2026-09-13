@@ -127,6 +127,33 @@ ORDER BY ${_orderByClause(sortBy, ascending)}
     }
   }
 
+  /// Searches by title, description, or an associated tag's name, all in
+  /// one SQL query - no table is ever pulled fully into memory. Matching is
+  /// case-insensitive and substring-based (`LIKE '%query%'`); `%`, `_`, and
+  /// `\\` in the user's input are escaped first so they're matched
+  /// literally rather than treated as SQL wildcards. Joins to
+  /// task_tags/tags only to test for a match - `SELECT DISTINCT t.*` keeps
+  /// a task that matches via more than one tag from appearing twice.
+  Future<List<TaskModel>> search(String query, {int limit = 100}) async {
+    final Database db = await _appDatabase.database;
+    final escaped = query.replaceAllMapped(RegExp(r'[\\%_]'), (m) => '\\${m[0]}');
+    final likeArg = '%$escaped%';
+
+    final sql = '''
+SELECT DISTINCT t.* FROM ${TasksTable.name} t
+LEFT JOIN ${TaskTagsTable.name} tt ON tt.${TaskTagsTable.taskId} = t.${TasksTable.id}
+LEFT JOIN ${TagsTable.name} tg ON tg.${TagsTable.id} = tt.${TaskTagsTable.tagId}
+WHERE t.${TasksTable.title} LIKE ? ESCAPE '\\'
+   OR t.${TasksTable.description} LIKE ? ESCAPE '\\'
+   OR tg.${TagsTable.tagName} LIKE ? ESCAPE '\\'
+ORDER BY ${_orderByClause(TaskSortOption.dueDate, true)}
+LIMIT ?
+''';
+
+    final rows = await db.rawQuery(sql, [likeArg, likeArg, likeArg, limit]);
+    return rows.map(TaskModel.fromMap).toList();
+  }
+
   Future<int> update(TaskModel task) async {
     final Database db = await _appDatabase.database;
     return db.update(

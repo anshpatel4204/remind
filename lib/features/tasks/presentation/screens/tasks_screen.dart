@@ -6,8 +6,12 @@ import '../../../../data/models/enums.dart';
 import '../../../../data/models/tag_model.dart';
 import '../../../../data/models/task_filter.dart';
 import '../../../../data/models/task_model.dart';
+import '../../../../presentation/widgets/remind_empty_state.dart';
+import '../../../../presentation/widgets/remind_error_state.dart';
+import '../../../../presentation/widgets/remind_loading_state.dart';
 import '../../../../presentation/widgets/repository_scope.dart';
 import '../../../categories/presentation/screens/categories_screen.dart';
+import '../../../search/presentation/screens/search_screen.dart';
 import '../../../tags/presentation/screens/tags_screen.dart';
 import '../widgets/task_filter_sheet.dart';
 import '../widgets/task_list_tile.dart';
@@ -175,6 +179,32 @@ class _TasksScreenState extends State<TasksScreen> {
     _reload();
   }
 
+  /// Applies a canonical preset (see [TaskFilterPresets]) by replacing only
+  /// the date/status axis of the current filter - category/tag/priority/
+  /// sort chosen via the full filter sheet are preserved, so a quick chip
+  /// and the advanced sheet combine instead of one wiping the other out.
+  void _applyPreset(TaskFilter preset) {
+    setState(() {
+      _filter = TaskFilter(
+        status: preset.status,
+        categoryId: _filter.categoryId,
+        priority: _filter.priority,
+        tagId: _filter.tagId,
+        dueDateFilter: preset.dueDateFilter,
+        customDueDateFrom: preset.customDueDateFrom,
+        customDueDateTo: preset.customDueDateTo,
+        sortBy: _filter.sortBy,
+        ascending: _filter.ascending,
+      );
+    });
+    _reload();
+  }
+
+  Future<void> _openSearch() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SearchScreen()));
+    _reload();
+  }
+
   Future<void> _openManage(Widget screen) async {
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
     _reload();
@@ -214,14 +244,48 @@ class _TasksScreenState extends State<TasksScreen> {
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return _TaskListErrorView(onRetry: _reload);
+            return REmindErrorState(
+              message: 'Something went wrong loading your tasks.',
+              onRetry: _reload,
+            );
           }
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+            return const REmindLoadingState();
           }
           final data = snapshot.data!;
+
           return Column(
             children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                child: TextField(
+                  readOnly: true,
+                  onTap: _openSearch,
+                  decoration: const InputDecoration(
+                    hintText: 'Search tasks...',
+                    prefixIcon: Icon(Icons.search),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 40,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  children: [
+                    for (final preset in TaskFilterPresets.quickList) ...[
+                      _QuickDateChip(
+                        label: preset.$1,
+                        selected: _filter.dueDateFilter == preset.$2.dueDateFilter &&
+                            _filter.status == preset.$2.status,
+                        onTap: () => _applyPreset(preset.$2),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                  ],
+                ),
+              ),
               if (_filter.hasActiveFilters)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
@@ -239,31 +303,44 @@ class _TasksScreenState extends State<TasksScreen> {
               Expanded(
                 child: data.tasks.isEmpty
                     ? (_filter.hasActiveFilters
-                        ? _NoMatchingTasksView(onClearFilters: _clearFilters)
-                        : _EmptyTasksView(onAddTask: _openAddTask))
+                        ? REmindEmptyState(
+                            icon: Icons.filter_alt_outlined,
+                            title: 'No tasks match these filters',
+                            message: 'Try a different filter, or clear them to see everything.',
+                            actionLabel: 'Clear filters',
+                            onAction: _clearFilters,
+                          )
+                        : REmindEmptyState(
+                            imageAsset: AppConstants.brandLogoAsset,
+                            title: 'No tasks yet',
+                            message: 'Tap the + button to add your first task.',
+                            actionLabel: 'Add task',
+                            onAction: _openAddTask,
+                          ))
                     : RefreshIndicator(
-                        onRefresh: () async => _reload(),
-                        child: ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
-                          itemCount: data.tasks.length,
-                          itemBuilder: (context, index) {
-                            final task = data.tasks[index];
-                            final category =
-                                task.categoryId == null ? null : data.categoryById[task.categoryId];
-                            return TaskListTile(
-                              task: task,
-                              category: category,
-                              tags: data.tagsByTaskId[task.id] ?? const [],
-                              hasActiveSnooze: data.activeSnoozeTaskIds.contains(task.id),
-                              onTap: () => _openDetails(task),
-                              onToggleComplete: () => _toggleComplete(task),
-                              onTogglePin: () => _togglePin(task),
-                              onEdit: () => _openEdit(task),
-                              onDelete: () => _confirmDelete(task),
-                            );
-                          },
-                        ),
-                      ),
+                            onRefresh: () async => _reload(),
+                            child: ListView.builder(
+                              padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
+                              itemCount: data.tasks.length,
+                              itemBuilder: (context, index) {
+                                final task = data.tasks[index];
+                                final category = task.categoryId == null
+                                    ? null
+                                    : data.categoryById[task.categoryId];
+                                return TaskListTile(
+                                  task: task,
+                                  category: category,
+                                  tags: data.tagsByTaskId[task.id] ?? const [],
+                                  hasActiveSnooze: data.activeSnoozeTaskIds.contains(task.id),
+                                  onTap: () => _openDetails(task),
+                                  onToggleComplete: () => _toggleComplete(task),
+                                  onTogglePin: () => _togglePin(task),
+                                  onEdit: () => _openEdit(task),
+                                  onDelete: () => _confirmDelete(task),
+                                );
+                              },
+                            ),
+                          ),
               ),
             ],
           );
@@ -297,104 +374,28 @@ class _TaskListData {
   final Set<int> activeSnoozeTaskIds;
 }
 
-class _EmptyTasksView extends StatelessWidget {
-  const _EmptyTasksView({required this.onAddTask});
+/// One pill in the Tasks screen's quick date-range row (All/Today/
+/// Upcoming/Overdue) - a thin wrapper around [ChoiceChip] so the row reads
+/// as a single connected control rather than plain buttons.
+class _QuickDateChip extends StatelessWidget {
+  const _QuickDateChip({required this.label, required this.selected, required this.onTap});
 
-  final VoidCallback onAddTask;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(AppConstants.brandLogoAsset, width: 96, height: 96),
-            const SizedBox(height: 16),
-            Text('No tasks yet', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(
-              'Tap the + button to add your first task.',
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: onAddTask,
-              icon: const Icon(Icons.add),
-              label: const Text('Add task'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NoMatchingTasksView extends StatelessWidget {
-  const _NoMatchingTasksView({required this.onClearFilters});
-
-  final VoidCallback onClearFilters;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.filter_alt_outlined,
-              size: 48,
-              color: Theme.of(context).colorScheme.outline,
-            ),
-            const SizedBox(height: 16),
-            Text('No tasks match these filters', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(
-              'Try a different filter, or clear them to see everything.',
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            OutlinedButton(onPressed: onClearFilters, child: const Text('Clear filters')),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TaskListErrorView extends StatelessWidget {
-  const _TaskListErrorView({required this.onRetry});
-
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.error_outline,
-              size: 48,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            const SizedBox(height: 16),
-            Text('Something went wrong loading your tasks', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-            ),
-          ],
-        ),
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      showCheckmark: false,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+      selectedColor: Theme.of(context).colorScheme.primary,
+      labelStyle: TextStyle(
+        color: selected ? Colors.white : Theme.of(context).colorScheme.onSurface,
+        fontWeight: FontWeight.w600,
       ),
     );
   }

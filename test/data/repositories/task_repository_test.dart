@@ -356,6 +356,179 @@ void main() {
         );
         expect(results.map((t) => t.id), [match.id]);
       });
+
+      test('combining status, category, priority, and tag filters ANDs all four together', () async {
+        final categories = await categoryRepository.getAllCategories();
+        final work = categories.firstWhere((c) => c.name == 'Work');
+        final tag = await tagRepository.createTag(name: 'combo-tag');
+
+        final match = await taskRepository.createTask(
+          title: 'Matches all four',
+          categoryId: work.id,
+          priority: TaskPriority.urgent,
+          tagIds: [tag.id!],
+          dueDate: now.add(const Duration(days: 1)),
+        );
+        // Same category/priority/tag, but not Pending (it's Completed) -
+        // must be excluded once status: pending is also required.
+        final wrongStatus = await taskRepository.createTask(
+          title: 'Same everything but completed',
+          categoryId: work.id,
+          priority: TaskPriority.urgent,
+          tagIds: [tag.id!],
+        );
+        await taskRepository.completeTask(wrongStatus.id!);
+
+        final results = await taskRepository.getFilteredTasks(
+          TaskFilter(
+            status: TaskDisplayStatus.pending,
+            categoryId: work.id,
+            priority: TaskPriority.urgent,
+            tagId: tag.id,
+          ),
+          now: now,
+        );
+        expect(results.map((t) => t.id), [match.id]);
+      });
+
+      test('date filter "tomorrow" only returns tasks due the next calendar day', () async {
+        await taskRepository.createTask(title: 'Today', dueDate: DateTime(2026, 6, 15, 9));
+        await taskRepository.createTask(title: 'Tomorrow morning', dueDate: DateTime(2026, 6, 16, 8));
+        await taskRepository.createTask(title: 'Tomorrow night', dueDate: DateTime(2026, 6, 16, 23));
+        await taskRepository.createTask(title: 'Day after', dueDate: DateTime(2026, 6, 17, 8));
+
+        final tomorrow = await taskRepository.getFilteredTasks(
+          const TaskFilter(dueDateFilter: DueDateFilter.tomorrow),
+          now: now,
+        );
+        expect(tomorrow.map((t) => t.title).toSet(), {'Tomorrow morning', 'Tomorrow night'});
+      });
+
+      test('date filter "this month" spans the whole calendar month', () async {
+        await taskRepository.createTask(title: 'Last day of May', dueDate: DateTime(2026, 5, 31, 23));
+        await taskRepository.createTask(title: 'Start of June', dueDate: DateTime(2026, 6, 1));
+        await taskRepository.createTask(title: 'Mid June', dueDate: DateTime(2026, 6, 15));
+        await taskRepository.createTask(title: 'End of June', dueDate: DateTime(2026, 6, 30, 23, 59));
+        await taskRepository.createTask(title: 'Start of July', dueDate: DateTime(2026, 7, 1));
+
+        final thisMonth = await taskRepository.getFilteredTasks(
+          const TaskFilter(dueDateFilter: DueDateFilter.thisMonth),
+          now: now,
+        );
+        expect(
+          thisMonth.map((t) => t.title).toSet(),
+          {'Start of June', 'Mid June', 'End of June'},
+        );
+      });
+
+      test('date filter "upcoming" is open-ended from tomorrow onward', () async {
+        await taskRepository.createTask(title: 'Today', dueDate: DateTime(2026, 6, 15, 9));
+        await taskRepository.createTask(title: 'Tomorrow', dueDate: DateTime(2026, 6, 16));
+        await taskRepository.createTask(title: 'Next year', dueDate: DateTime(2027, 1, 1));
+
+        final upcoming = await taskRepository.getFilteredTasks(
+          const TaskFilter(dueDateFilter: DueDateFilter.upcoming),
+          now: now,
+        );
+        expect(upcoming.map((t) => t.title).toSet(), {'Tomorrow', 'Next year'});
+      });
+
+      test(
+        'DueDateFilter.overdue excludes completed/cancelled tasks even with a past due date',
+        () async {
+          final stillOverdue = await taskRepository.createTask(
+            title: 'Still overdue',
+            dueDate: now.subtract(const Duration(days: 1)),
+          );
+          final completedLate = await taskRepository.createTask(
+            title: 'Completed after its due date',
+            dueDate: now.subtract(const Duration(days: 2)),
+          );
+          await taskRepository.completeTask(completedLate.id!);
+          final cancelledLate = await taskRepository.createTask(
+            title: 'Cancelled, was overdue',
+            dueDate: now.subtract(const Duration(days: 3)),
+          );
+          await taskRepository.updateTask(cancelledLate.copyWith(status: TaskStatus.cancelled));
+
+          final results = await taskRepository.getFilteredTasks(
+            const TaskFilter(dueDateFilter: DueDateFilter.overdue),
+            now: now,
+          );
+          expect(results.map((t) => t.id), [stillOverdue.id]);
+
+          // TaskFilterPresets.overdue (status-based) must agree.
+          final viaPreset = await taskRepository.getFilteredTasks(
+            const TaskFilter(status: TaskDisplayStatus.overdue),
+            now: now,
+          );
+          expect(viaPreset.map((t) => t.id), [stillOverdue.id]);
+        },
+      );
+    });
+  });
+
+  group('searchTasks (SQL LIKE across title/description/tags)', () {
+    test('empty or whitespace-only query returns no results without querying', () async {
+      await taskRepository.createTask(title: 'Anything');
+      expect(await taskRepository.searchTasks(''), isEmpty);
+      expect(await taskRepository.searchTasks('   '), isEmpty);
+    });
+
+    test('matches by title, case-insensitively', () async {
+      final match = await taskRepository.createTask(title: 'Submit Project Report');
+      await taskRepository.createTask(title: 'Unrelated task');
+
+      final results = await taskRepository.searchTasks('project report');
+      expect(results.map((t) => t.id), [match.id]);
+    });
+
+    test('matches by description', () async {
+      final match = await taskRepository.createTask(
+        title: 'Untitled',
+        description: 'Remember to water the plants',
+      );
+      await taskRepository.createTask(title: 'Other', description: 'Nothing relevant here');
+
+      final results = await taskRepository.searchTasks('water the plants');
+      expect(results.map((t) => t.id), [match.id]);
+    });
+
+    test('matches by tag name', () async {
+      final tag = await tagRepository.createTag(name: 'urgent');
+      final match = await taskRepository.createTask(title: 'Tagged task', tagIds: [tag.id!]);
+      await taskRepository.createTask(title: 'Untagged task');
+
+      final results = await taskRepository.searchTasks('urgent');
+      expect(results.map((t) => t.id), [match.id]);
+    });
+
+    test('a task matching via two tags is only returned once', () async {
+      final tagA = await tagRepository.createTag(name: 'work-urgent');
+      final tagB = await tagRepository.createTag(name: 'work-important');
+      final match = await taskRepository.createTask(
+        title: 'Double tagged',
+        tagIds: [tagA.id!, tagB.id!],
+      );
+
+      final results = await taskRepository.searchTasks('work-');
+      expect(results.map((t) => t.id).toList(), [match.id]);
+    });
+
+    test('a query matching nothing returns an empty list, not an error', () async {
+      await taskRepository.createTask(title: 'Completely unrelated');
+      expect(await taskRepository.searchTasks('xyzzy-no-match'), isEmpty);
+    });
+
+    test('LIKE wildcard characters in the query are matched literally', () async {
+      await taskRepository.createTask(title: 'Discount: 50% off widgets');
+      await taskRepository.createTask(title: 'Totally different title');
+
+      // A literal "%" in the query must not act as a SQL LIKE wildcard
+      // that would match every task.
+      final results = await taskRepository.searchTasks('50%');
+      expect(results, hasLength(1));
+      expect(results.single.title, contains('50%'));
     });
   });
 

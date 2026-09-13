@@ -7,7 +7,11 @@ import '../../../../data/models/enums.dart';
 import '../../../../data/models/tag_model.dart';
 import '../../../../data/models/task_filter.dart';
 import '../../../../data/models/task_model.dart';
-import '../../../../core/utils/task_status_calculator.dart';
+import '../../../../presentation/widgets/remind_empty_state.dart';
+import '../../../../presentation/widgets/remind_error_state.dart';
+import '../../../../presentation/widgets/remind_loading_state.dart';
+import '../../../../presentation/widgets/remind_section_header.dart';
+import '../../../../presentation/widgets/remind_stat_card.dart';
 import '../../../../presentation/widgets/repository_scope.dart';
 import '../../../tasks/presentation/screens/task_details_screen.dart';
 import '../../../tasks/presentation/screens/task_form_screen.dart';
@@ -43,14 +47,14 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  static const _overdueFilter = TaskFilter(status: TaskDisplayStatus.overdue);
-  static const _dueTodayFilter = TaskFilter(dueDateFilter: DueDateFilter.today);
-  static const _completedFilter = TaskFilter(status: TaskDisplayStatus.completed);
-
-  TaskFilter _upcomingFilter(DateTime now) {
-    final startOfTomorrow = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
-    return TaskFilter(dueDateFilter: DueDateFilter.custom, customDueDateFrom: startOfTomorrow);
-  }
+  // These reuse the canonical presets in TaskFilterPresets rather than
+  // defining their own TaskFilter, so "what counts as Overdue/Upcoming/
+  // etc." can't quietly drift out of sync with the Tasks tab's quick
+  // filter chips, which draw from the same presets.
+  static const _overdueFilter = TaskFilterPresets.overdue;
+  static const _dueTodayFilter = TaskFilterPresets.today;
+  static const _completedFilter = TaskFilterPresets.completed;
+  static const _upcomingFilter = TaskFilterPresets.upcoming;
 
   Future<_HomeData> _load() async {
     final repos = RepositoryScope.of(context);
@@ -58,7 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final overdue = await repos.taskRepository.getFilteredTasks(_overdueFilter, now: now);
     final dueToday = await repos.taskRepository.getFilteredTasks(_dueTodayFilter, now: now);
-    final upcoming = await repos.taskRepository.getFilteredTasks(_upcomingFilter(now), now: now);
+    final upcoming = await repos.taskRepository.getFilteredTasks(_upcomingFilter, now: now);
     final completed = await repos.taskRepository.getFilteredTasks(_completedFilter, now: now);
     final pinnedAll = await repos.taskRepository.getAllTasks(pinnedOnly: true);
     final pinned = pinnedAll
@@ -186,10 +190,13 @@ class _HomeScreenState extends State<HomeScreen> {
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return _HomeErrorView(onRetry: _reload);
+            return REmindErrorState(
+              message: 'Something went wrong loading your dashboard.',
+              onRetry: _reload,
+            );
           }
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+            return const REmindLoadingState();
           }
           final data = snapshot.data!;
           return RefreshIndicator(
@@ -214,28 +221,28 @@ class _HomeScreenState extends State<HomeScreen> {
                   mainAxisSpacing: 12,
                   childAspectRatio: 1.3,
                   children: [
-                    _StatCard(
+                    REmindStatCard(
                       icon: Icons.warning_amber_rounded,
                       label: 'Overdue',
                       count: data.overdueCount,
                       color: Theme.of(context).colorScheme.error,
                       onTap: () => _openFiltered(_overdueFilter),
                     ),
-                    _StatCard(
+                    REmindStatCard(
                       icon: Icons.today_outlined,
                       label: 'Due today',
                       count: data.dueTodayTasks.length,
                       color: Theme.of(context).colorScheme.primary,
                       onTap: () => _openFiltered(_dueTodayFilter),
                     ),
-                    _StatCard(
+                    REmindStatCard(
                       icon: Icons.upcoming_outlined,
                       label: 'Upcoming',
                       count: data.upcomingCount,
                       color: Theme.of(context).colorScheme.tertiary,
-                      onTap: () => _openFiltered(_upcomingFilter(now)),
+                      onTap: () => _openFiltered(_upcomingFilter),
                     ),
-                    _StatCard(
+                    REmindStatCard(
                       icon: Icons.check_circle_outline,
                       label: 'Completed',
                       count: data.completedCount,
@@ -246,7 +253,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 if (data.pinnedTasks.isNotEmpty) ...[
                   const SizedBox(height: 24),
-                  const _SectionHeader(title: 'Pinned', icon: Icons.push_pin),
+                  const REmindSectionHeader(title: 'Pinned', icon: Icons.push_pin),
                   const SizedBox(height: 8),
                   for (final task in data.pinnedTasks)
                     TaskListTile(
@@ -262,10 +269,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                 ],
                 const SizedBox(height: 24),
-                const _SectionHeader(title: "Today's tasks", icon: Icons.checklist_outlined),
+                const REmindSectionHeader(title: "Today's tasks", icon: Icons.checklist_outlined),
                 const SizedBox(height: 8),
                 if (data.dueTodayTasks.isEmpty)
-                  const _EmptyTodayView()
+                  const REmindEmptyState(
+                    compact: true,
+                    title: 'No tasks for today 🎉',
+                    message: 'Your schedule is clear.',
+                  )
                 else
                   for (final task in data.dueTodayTasks)
                     TaskListTile(
@@ -316,123 +327,3 @@ class _HomeData {
   final Set<int> activeSnoozeTaskIds;
 }
 
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.icon,
-    required this.label,
-    required this.count,
-    required this.color,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final int count;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: color, size: 22),
-              const SizedBox(height: 4),
-              Text(
-                '$count',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleLarge
-                    ?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, required this.icon});
-
-  final String title;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
-        const SizedBox(width: 6),
-        Text(title, style: Theme.of(context).textTheme.titleMedium),
-      ],
-    );
-  }
-}
-
-class _EmptyTodayView extends StatelessWidget {
-  const _EmptyTodayView();
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            Text('No tasks for today 🎉', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(
-              'Your schedule is clear.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _HomeErrorView extends StatelessWidget {
-  const _HomeErrorView({required this.onRetry});
-
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
-            const SizedBox(height: 12),
-            const Text('Something went wrong loading your dashboard.'),
-            const SizedBox(height: 16),
-            FilledButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
-        ),
-      ),
-    );
-  }
-}

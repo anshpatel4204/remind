@@ -9,6 +9,8 @@ import '../../../../data/models/enums.dart';
 import '../../../../data/models/reminder_model.dart';
 import '../../../../data/models/tag_model.dart';
 import '../../../../data/models/task_model.dart';
+import '../../../../presentation/widgets/remind_error_state.dart';
+import '../../../../presentation/widgets/remind_loading_state.dart';
 import '../../../../presentation/widgets/repository_scope.dart';
 import '../../../../services/notification/notification_scheduler.dart';
 import '../widgets/priority_badge.dart';
@@ -191,10 +193,13 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+            return const REmindLoadingState();
           }
           if (snapshot.hasError) {
-            return _TaskDetailsErrorView(onRetry: _reload);
+            return REmindErrorState(
+              message: 'Something went wrong loading this task.',
+              onRetry: _reload,
+            );
           }
           final data = snapshot.data;
           if (data == null) {
@@ -399,51 +404,42 @@ class _SnoozeOptionsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text('Snooze for', style: Theme.of(context).textTheme.titleMedium),
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(color: primary.withValues(alpha: 0.15), shape: BoxShape.circle),
+              alignment: Alignment.center,
+              child: Icon(Icons.notifications_outlined, color: primary),
             ),
+            const SizedBox(height: 12),
+            Text('Snooze Reminder', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
             for (final preset in _presets)
               ListTile(
+                leading: Icon(Icons.schedule_outlined, color: primary),
                 title: Text(preset.$2),
                 onTap: () => Navigator.of(context).pop(_SnoozeChoice(preset.$1)),
               ),
             ListTile(
+              leading: Icon(Icons.edit_calendar_outlined, color: primary),
               title: const Text('Custom time...'),
               onTap: () => _pickCustom(context),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TaskDetailsErrorView extends StatelessWidget {
-  const _TaskDetailsErrorView({required this.onRetry});
-
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
-            const SizedBox(height: 12),
-            const Text('Something went wrong loading this task.'),
-            const SizedBox(height: 16),
-            FilledButton(onPressed: onRetry, child: const Text('Retry')),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+            ),
           ],
         ),
       ),

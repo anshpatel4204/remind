@@ -1,24 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/category_colors.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/color_utils.dart';
 import '../../../../data/models/category_model.dart';
 import '../../../../data/models/enums.dart';
+import '../../../../presentation/widgets/remind_bar_chart.dart';
+import '../../../../presentation/widgets/remind_donut_chart.dart';
+import '../../../../presentation/widgets/remind_empty_state.dart';
+import '../../../../presentation/widgets/remind_error_state.dart';
+import '../../../../presentation/widgets/remind_loading_state.dart';
+import '../../../../presentation/widgets/remind_section_header.dart';
+import '../../../../presentation/widgets/remind_stat_card.dart';
 import '../../../../presentation/widgets/repository_scope.dart';
-
-const Map<TaskPriority, Color> _priorityColors = {
-  TaskPriority.low: Color(0xFF6C757D),
-  TaskPriority.medium: Color(0xFF2E86AB),
-  TaskPriority.high: Color(0xFFF77F00),
-  TaskPriority.urgent: Color(0xFFE63946),
-};
-
-const Map<TaskPriority, String> _priorityLabels = {
-  TaskPriority.low: 'Low',
-  TaskPriority.medium: 'Medium',
-  TaskPriority.high: 'High',
-  TaskPriority.urgent: 'Urgent',
-};
 
 /// The Statistics tab: simple counts and breakdowns computed client-side
 /// from [TaskRepository.getAllTasks] - no new repository methods, and no
@@ -58,6 +52,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     final byPriority = <TaskPriority, int>{for (final p in TaskPriority.values) p: 0};
     final byCategory = <int?, int>{};
 
+    // Monday-start week containing `now`, for the "Tasks Completed" chart -
+    // real completedAt data, not a fabricated trend.
+    final weekStart = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
+    final weekEnd = weekStart.add(const Duration(days: 7));
+    final completedByWeekday = List<int>.filled(7, 0);
+
     for (final task in tasks) {
       final isOverdue = task.dueDate != null &&
           task.dueDate!.isBefore(now) &&
@@ -66,6 +66,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
       if (task.status == TaskStatus.completed) {
         completed++;
+        final completedAt = task.completedAt;
+        if (completedAt != null && !completedAt.isBefore(weekStart) && completedAt.isBefore(weekEnd)) {
+          completedByWeekday[completedAt.weekday - 1]++;
+        }
       } else if (task.status == TaskStatus.cancelled) {
         cancelled++;
       } else if (isOverdue) {
@@ -87,6 +91,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
       byPriority: byPriority,
       byCategory: byCategory,
       categoryById: {for (final c in categories) if (c.id != null) c.id!: c},
+      completedByWeekday: completedByWeekday,
     );
   }
 
@@ -104,14 +109,21 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return _StatisticsErrorView(onRetry: _reload);
+            return REmindErrorState(
+              message: 'Something went wrong loading your statistics.',
+              onRetry: _reload,
+            );
           }
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+            return const REmindLoadingState();
           }
           final data = snapshot.data!;
           if (data.total == 0) {
-            return const _EmptyStatisticsView();
+            return const REmindEmptyState(
+              icon: Icons.bar_chart_outlined,
+              title: 'No data yet',
+              message: 'Add some tasks to see your stats here.',
+            );
           }
           final completionRate = data.completed / data.total;
 
@@ -126,16 +138,36 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   crossAxisCount: 2,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 1.8,
+                  childAspectRatio: 1.3,
                   children: [
-                    _SummaryTile(label: 'Total', count: data.total, color: Theme.of(context).colorScheme.primary),
-                    _SummaryTile(label: 'Completed', count: data.completed, color: Colors.green),
-                    _SummaryTile(label: 'Pending', count: data.pending, color: Theme.of(context).colorScheme.tertiary),
-                    _SummaryTile(label: 'Overdue', count: data.overdue, color: Theme.of(context).colorScheme.error),
+                    REmindStatCard(
+                      icon: Icons.list_alt_outlined,
+                      label: 'Total',
+                      count: data.total,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    REmindStatCard(
+                      icon: Icons.check_circle_outline,
+                      label: 'Completed',
+                      count: data.completed,
+                      color: Colors.green,
+                    ),
+                    REmindStatCard(
+                      icon: Icons.schedule_outlined,
+                      label: 'Pending',
+                      count: data.pending,
+                      color: Theme.of(context).colorScheme.tertiary,
+                    ),
+                    REmindStatCard(
+                      icon: Icons.warning_amber_rounded,
+                      label: 'Overdue',
+                      count: data.overdue,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 24),
-                Text('Completion rate', style: Theme.of(context).textTheme.titleMedium),
+                const REmindSectionHeader(title: 'Completion rate', icon: Icons.trending_up_outlined),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -155,28 +187,107 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   ],
                 ),
                 const SizedBox(height: 28),
-                Text('By priority', style: Theme.of(context).textTheme.titleMedium),
+                const REmindSectionHeader(
+                  title: 'Tasks Completed',
+                  icon: Icons.stacked_bar_chart_outlined,
+                ),
+                const SizedBox(height: 12),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+                    child: REmindBarChart(
+                      values: [
+                        for (var i = 0; i < 7; i++)
+                          BarValue(
+                            label: const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i],
+                            value: data.completedByWeekday[i],
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 28),
+                const REmindSectionHeader(title: 'Category Breakdown', icon: Icons.category_outlined),
+                const SizedBox(height: 12),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        REmindDonutChart(
+                          centerLabel: '${data.total}',
+                          segments: [
+                            for (final entry in data.sortedCategoryCounts())
+                              DonutSegment(
+                                label: entry.key == null
+                                    ? 'Uncategorized'
+                                    : (data.categoryById[entry.key]?.name ?? 'Unknown'),
+                                value: entry.value,
+                                color: entry.key == null
+                                    ? Theme.of(context).colorScheme.outline
+                                    : (colorFromHex(data.categoryById[entry.key]?.color) ??
+                                        kDefaultCategoryColors[data.categoryById[entry.key]?.name] ??
+                                        Theme.of(context).colorScheme.primary),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(width: 20),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (final entry in data.sortedCategoryCounts())
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 10,
+                                        height: 10,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: entry.key == null
+                                              ? Theme.of(context).colorScheme.outline
+                                              : (colorFromHex(data.categoryById[entry.key]?.color) ??
+                                                  kDefaultCategoryColors[data.categoryById[entry.key]?.name] ??
+                                                  Theme.of(context).colorScheme.primary),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          entry.key == null
+                                              ? 'Uncategorized'
+                                              : (data.categoryById[entry.key]?.name ?? 'Unknown'),
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(context).textTheme.bodySmall,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${data.total == 0 ? 0 : (entry.value / data.total * 100).round()}%',
+                                        style: Theme.of(context).textTheme.labelMedium,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 28),
+                const REmindSectionHeader(title: 'By priority', icon: Icons.flag_outlined),
                 const SizedBox(height: 12),
                 for (final priority in TaskPriority.values)
                   _BreakdownRow(
-                    label: _priorityLabels[priority]!,
+                    label: AppColors.priorityLabel[priority]!,
                     count: data.byPriority[priority] ?? 0,
                     total: data.total,
-                    color: _priorityColors[priority]!,
-                  ),
-                const SizedBox(height: 28),
-                Text('By category', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 12),
-                for (final entry in data.sortedCategoryCounts())
-                  _BreakdownRow(
-                    label: entry.key == null ? 'Uncategorized' : (data.categoryById[entry.key]?.name ?? 'Unknown'),
-                    count: entry.value,
-                    total: data.total,
-                    color: entry.key == null
-                        ? Theme.of(context).colorScheme.outline
-                        : (colorFromHex(data.categoryById[entry.key]?.color) ??
-                            kDefaultCategoryColors[data.categoryById[entry.key]?.name] ??
-                            Theme.of(context).colorScheme.primary),
+                    color: AppColors.priority[priority]!,
                   ),
               ],
             ),
@@ -197,6 +308,7 @@ class _StatsData {
     required this.byPriority,
     required this.byCategory,
     required this.categoryById,
+    required this.completedByWeekday,
   });
 
   final int total;
@@ -208,47 +320,16 @@ class _StatsData {
   final Map<int?, int> byCategory;
   final Map<int, CategoryModel> categoryById;
 
+  /// Completed-task counts for the current week, Monday first - real data
+  /// from each task's `completedAt`, used by the "Tasks Completed" chart.
+  final List<int> completedByWeekday;
+
   List<MapEntry<int?, int>> sortedCategoryCounts() {
     final entries = byCategory.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
     return entries;
   }
 }
 
-class _SummaryTile extends StatelessWidget {
-  const _SummaryTile({required this.label, required this.count, required this.color});
-
-  final String label;
-  final int count;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              '$count',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _BreakdownRow extends StatelessWidget {
   const _BreakdownRow({
@@ -294,60 +375,6 @@ class _BreakdownRow extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _EmptyStatisticsView extends StatelessWidget {
-  const _EmptyStatisticsView();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.bar_chart_outlined, size: 48, color: Theme.of(context).colorScheme.outline),
-            const SizedBox(height: 12),
-            Text('No data yet', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(
-              'Add some tasks to see your stats here.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatisticsErrorView extends StatelessWidget {
-  const _StatisticsErrorView({required this.onRetry});
-
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
-            const SizedBox(height: 12),
-            const Text('Something went wrong loading your statistics.'),
-            const SizedBox(height: 16),
-            FilledButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
-        ),
       ),
     );
   }

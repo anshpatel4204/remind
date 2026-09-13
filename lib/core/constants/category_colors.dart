@@ -46,3 +46,21 @@ const List<String> kCategoryColorSwatches = [
   '#A0522D',
   '#495057',
 ];
+
+/// Presentation-only default icons for the 7 seeded categories, used only
+/// as a fallback when a category has no meaningful `iconName` stored (the
+/// schema has the column, but nothing currently populates it) - purely a
+/// UI concern, same spirit as [kDefaultCategoryColors].
+const Map<String, IconData> kDefaultCategoryIcons = {
+  'Work': Icons.work_outline,
+  'Study': Icons.menu_book_outlined,
+  'Personal': Icons.home_outlined,
+  'Finance': Icons.account_balance_wallet_outlined,
+  'Shopping': Icons.shopping_cart_outlined,
+  'Health': Icons.favorite_outline,
+  'Other': Icons.chat_bubble_outline,
+};
+
+/// Fallback icon for a custom category that doesn't match any of the
+/// defaults above.
+const IconData kFallbackCategoryIcon = Icons.label_outline;

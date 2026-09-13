@@ -93,7 +93,7 @@ class TaskRepository {
       effectiveNow,
     );
 
-    final tasks = await getAllTasks(
+    var tasks = await getAllTasks(
       categoryId: filter.categoryId,
       priority: filter.priority,
       tagId: filter.tagId,
@@ -104,10 +104,35 @@ class TaskRepository {
       ascending: filter.ascending,
     );
 
+    // "Overdue" is inherently about tasks that are still outstanding - a
+    // completed or cancelled task with a past due date isn't meaningfully
+    // "overdue", so this window always excludes terminal statuses
+    // regardless of what filter.status separately asks for. (Preferring
+    // TaskFilterPresets.overdue - which filters by computed display status
+    // instead - already gets this right without relying on this
+    // exclusion, but this keeps DueDateFilter.overdue correct too for any
+    // caller that uses it directly, e.g. the filter sheet's Date chips.)
+    if (filter.dueDateFilter == DueDateFilter.overdue) {
+      tasks = tasks
+          .where((t) => t.status != TaskStatus.completed && t.status != TaskStatus.cancelled)
+          .toList();
+    }
+
     if (filter.status == null) return tasks;
     return tasks
         .where((t) => TaskStatusCalculator.displayStatusFor(t, now: effectiveNow) == filter.status)
         .toList();
+  }
+
+  /// Searches tasks by title, description, or tag name - a real SQL query
+  /// (see [TaskDataSource.search]), not an in-memory scan of every task, so
+  /// it stays fast regardless of how large the task table grows. Returns at
+  /// most [limit] matches, most-relevant-ish first (pinned, then by due
+  /// date) - the same ordering [getAllTasks] uses by default.
+  Future<List<TaskModel>> searchTasks(String query, {int limit = 100}) {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return Future.value(const []);
+    return _taskDataSource.search(trimmed, limit: limit);
   }
 
   /// Resolves a [DueDateFilter] shortcut into a concrete `[from, to]` due
@@ -128,6 +153,12 @@ class TaskRepository {
             .add(const Duration(days: 1))
             .subtract(const Duration(milliseconds: 1));
         return (from: startOfDay, to: endOfDay, noDueDateOnly: false);
+      case DueDateFilter.tomorrow:
+        final startOfTomorrow = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+        final endOfTomorrow = startOfTomorrow
+            .add(const Duration(days: 1))
+            .subtract(const Duration(milliseconds: 1));
+        return (from: startOfTomorrow, to: endOfTomorrow, noDueDateOnly: false);
       case DueDateFilter.thisWeek:
         final startOfDay = DateTime(now.year, now.month, now.day);
         final startOfWeek = startOfDay.subtract(Duration(days: startOfDay.weekday - 1));
@@ -135,6 +166,13 @@ class TaskRepository {
             .add(const Duration(days: 7))
             .subtract(const Duration(milliseconds: 1));
         return (from: startOfWeek, to: endOfWeek, noDueDateOnly: false);
+      case DueDateFilter.thisMonth:
+        final startOfMonth = DateTime(now.year, now.month);
+        final endOfMonth = DateTime(now.year, now.month + 1).subtract(const Duration(milliseconds: 1));
+        return (from: startOfMonth, to: endOfMonth, noDueDateOnly: false);
+      case DueDateFilter.upcoming:
+        final startOfTomorrow = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+        return (from: startOfTomorrow, to: null, noDueDateOnly: false);
       case DueDateFilter.overdue:
         return (from: null, to: now, noDueDateOnly: false);
       case DueDateFilter.noDueDate:

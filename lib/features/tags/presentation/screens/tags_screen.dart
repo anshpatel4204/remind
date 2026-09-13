@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../data/models/tag_model.dart';
+import '../../../../presentation/widgets/remind_loading_state.dart';
 import '../../../../presentation/widgets/repository_scope.dart';
 
 /// Lets the user create, rename, and delete tags. Deleting a tag removes
@@ -126,7 +127,7 @@ class _TagsScreenState extends State<TagsScreen> {
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+            return const REmindLoadingState();
           }
           final tags = snapshot.data!;
           if (tags.isEmpty) {

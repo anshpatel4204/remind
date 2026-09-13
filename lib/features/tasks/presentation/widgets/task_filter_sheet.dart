@@ -188,7 +188,10 @@ class _TaskFilterSheetState extends State<_TaskFilterSheet> {
                   for (final option in const [
                     DueDateFilter.any,
                     DueDateFilter.today,
+                    DueDateFilter.tomorrow,
                     DueDateFilter.thisWeek,
+                    DueDateFilter.thisMonth,
+                    DueDateFilter.upcoming,
                     DueDateFilter.overdue,
                     DueDateFilter.noDueDate,
                   ])
@@ -270,8 +273,14 @@ class _TaskFilterSheetState extends State<_TaskFilterSheet> {
         return 'Any time';
       case DueDateFilter.today:
         return 'Today';
+      case DueDateFilter.tomorrow:
+        return 'Tomorrow';
       case DueDateFilter.thisWeek:
         return 'This week';
+      case DueDateFilter.thisMonth:
+        return 'This month';
+      case DueDateFilter.upcoming:
+        return 'Upcoming';
       case DueDateFilter.overdue:
         return 'Overdue';
       case DueDateFilter.noDueDate:

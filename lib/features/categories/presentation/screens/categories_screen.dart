@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/category_colors.dart';
+import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/color_utils.dart';
 import '../../../../data/models/category_model.dart';
+import '../../../../presentation/widgets/remind_loading_state.dart';
 import '../../../../presentation/widgets/repository_scope.dart';
 
 /// Lets the user create, rename, and delete custom categories. The 7
@@ -18,7 +20,7 @@ class CategoriesScreen extends StatefulWidget {
 }
 
 class _CategoriesScreenState extends State<CategoriesScreen> {
-  late Future<List<CategoryModel>> _future;
+  late Future<_CategoriesData> _future;
   bool _initialized = false;
 
   @override
@@ -30,8 +32,17 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     }
   }
 
-  Future<List<CategoryModel>> _load() =>
-      RepositoryScope.of(context).categoryRepository.getAllCategories();
+  Future<_CategoriesData> _load() async {
+    final repos = RepositoryScope.of(context);
+    final categories = await repos.categoryRepository.getAllCategories();
+    final counts = <int, int>{};
+    for (final category in categories) {
+      if (category.id == null) continue;
+      final tasks = await repos.taskRepository.getAllTasks(categoryId: category.id);
+      counts[category.id!] = tasks.length;
+    }
+    return _CategoriesData(categories: categories, taskCounts: counts);
+  }
 
   void _reload() {
     setState(() {
@@ -161,42 +172,48 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Categories')),
-      body: FutureBuilder<List<CategoryModel>>(
+      body: FutureBuilder<_CategoriesData>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+            return const REmindLoadingState();
           }
-          final categories = snapshot.data!;
+          final data = snapshot.data!;
+          final categories = data.categories;
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
             itemCount: categories.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 4),
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final category = categories[index];
               final color = colorFromHex(category.color) ?? kDefaultCategoryColors[category.name];
+              final effectiveColor = color ?? Theme.of(context).colorScheme.primary;
+              final icon = kDefaultCategoryIcons[category.name] ?? kFallbackCategoryIcon;
+              final count = category.id == null ? 0 : (data.taskCounts[category.id!] ?? 0);
               return Card(
                 child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: color ?? Theme.of(context).colorScheme.secondaryContainer,
-                    radius: 12,
+                  leading: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: effectiveColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(icon, color: effectiveColor),
                   ),
                   title: Text(category.name),
-                  subtitle: category.isDefault ? const Text('Default category') : null,
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit_outlined),
-                        tooltip: 'Rename',
-                        onPressed: () => _showCategoryDialog(existing: category),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline),
-                        tooltip:
-                            category.isDefault ? 'Default categories cannot be deleted' : 'Delete',
-                        onPressed: category.isDefault ? null : () => _confirmDelete(category),
-                      ),
+                  subtitle: Text('$count ${count == 1 ? 'task' : 'tasks'}'),
+                  trailing: PopupMenuButton<String>(
+                    tooltip: 'Category options',
+                    onSelected: (value) {
+                      if (value == 'edit') _showCategoryDialog(existing: category);
+                      if (value == 'delete') _confirmDelete(category);
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(value: 'edit', child: Text('Rename / recolor')),
+                      if (!category.isDefault)
+                        const PopupMenuItem(value: 'delete', child: Text('Delete')),
                     ],
                   ),
                 ),
@@ -235,4 +252,15 @@ class _ColorSwatch extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The Categories screen's loaded state: the category list plus a
+/// per-category task count (computed client-side from
+/// [TaskRepository.getAllTasks], no new repository method) so each row can
+/// show "N tasks" like the reference.
+class _CategoriesData {
+  const _CategoriesData({required this.categories, required this.taskCounts});
+
+  final List<CategoryModel> categories;
+  final Map<int, int> taskCounts;
 }
