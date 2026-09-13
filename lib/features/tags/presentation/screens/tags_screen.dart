@@ -30,7 +30,8 @@ class _TagsScreenState extends State<TagsScreen> {
     }
   }
 
-  Future<List<TagModel>> _load() => RepositoryScope.of(context).tagRepository.getAllTags();
+  Future<List<TagModel>> _load() =>
+      RepositoryScope.of(context).tagRepository.getAllTags();
 
   void _reload() {
     setState(() {
@@ -52,8 +53,9 @@ class _TagsScreenState extends State<TagsScreen> {
             controller: controller,
             autofocus: true,
             decoration: const InputDecoration(labelText: 'Tag name'),
-            validator: (value) =>
-                (value == null || value.trim().isEmpty) ? 'Name is required' : null,
+            validator: (value) => (value == null || value.trim().isEmpty)
+                ? 'Name is required'
+                : null,
           ),
         ),
         actions: [

@@ -59,7 +59,9 @@ void main() {
       expect(await repository.getDefaultTaskPriority(), isNull);
     });
 
-    test('a corrupted stored value is treated as no default rather than crashing', () async {
+    test(
+        'a corrupted stored value is treated as no default rather than crashing',
+        () async {
       await repository.setValue('default_task_priority', 'not-a-number');
       expect(await repository.getDefaultTaskPriority(), isNull);
 

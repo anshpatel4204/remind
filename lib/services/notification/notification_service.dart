@@ -20,9 +20,11 @@ class NotificationService implements NotificationTransport {
   // sound/vibration combinations up front and [schedule] just picks the
   // channel matching the user's current settings - the plugin call sees
   // a "new" channel per combination, never a channel changing shape.
-  static const String _channelDescription = 'Notifications for REmind task reminders';
+  static const String _channelDescription =
+      'Notifications for REmind task reminders';
 
-  final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _plugin =
+      FlutterLocalNotificationsPlugin();
   bool _initialized = false;
 
   static String _channelId(bool soundEnabled, bool vibrationEnabled) {
@@ -33,7 +35,8 @@ class NotificationService implements NotificationTransport {
   }
 
   static String _channelName(bool soundEnabled, bool vibrationEnabled) {
-    if (soundEnabled && vibrationEnabled) return 'Task reminders (sound & vibration)';
+    if (soundEnabled && vibrationEnabled)
+      return 'Task reminders (sound & vibration)';
     if (soundEnabled) return 'Task reminders (sound only)';
     if (vibrationEnabled) return 'Task reminders (vibration only)';
     return 'Task reminders (silent)';
@@ -47,14 +50,17 @@ class NotificationService implements NotificationTransport {
   ];
 
   AndroidFlutterLocalNotificationsPlugin? get _androidPlugin =>
-      _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
 
   @override
   Future<void> initialize({
-    required Future<void> Function(NotificationInteraction interaction) onInteraction,
+    required Future<void> Function(NotificationInteraction interaction)
+        onInteraction,
   }) {
     return _initializePlugin(
-      onForegroundResponse: (response) => onInteraction(_toInteraction(response)),
+      onForegroundResponse: (response) =>
+          onInteraction(_toInteraction(response)),
     );
   }
 
@@ -79,13 +85,16 @@ class NotificationService implements NotificationTransport {
     final timezoneInfo = await FlutterTimezone.getLocalTimezone();
     tz.setLocalLocation(tz.getLocation(timezoneInfo.identifier));
 
-    const androidInitializationSettings = AndroidInitializationSettings('notification_icon');
-    const initializationSettings = InitializationSettings(android: androidInitializationSettings);
+    const androidInitializationSettings =
+        AndroidInitializationSettings('notification_icon');
+    const initializationSettings =
+        InitializationSettings(android: androidInitializationSettings);
 
     await _plugin.initialize(
       settings: initializationSettings,
       onDidReceiveNotificationResponse: onForegroundResponse,
-      onDidReceiveBackgroundNotificationResponse: notificationBackgroundEntryPoint,
+      onDidReceiveBackgroundNotificationResponse:
+          notificationBackgroundEntryPoint,
     );
 
     for (final combination in _channelCombinations) {
@@ -162,8 +171,9 @@ class NotificationService implements NotificationTransport {
       // that same absolute instant under tz.local - it does not shift it.
       scheduledDate: tz.TZDateTime.from(scheduledTime, tz.local),
       notificationDetails: notificationDetails,
-      androidScheduleMode:
-          exact ? AndroidScheduleMode.exactAllowWhileIdle : AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: exact
+          ? AndroidScheduleMode.exactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle,
       payload: payload,
     );
   }
@@ -200,10 +210,12 @@ NotificationInteraction _toInteraction(NotificationResponse response) {
 /// with this exact `@pragma('vm:entry-point')` annotation, or the Android
 /// build will tree-shake it away and this path will silently never fire.
 @pragma('vm:entry-point')
-Future<void> notificationBackgroundEntryPoint(NotificationResponse response) async {
+Future<void> notificationBackgroundEntryPoint(
+    NotificationResponse response) async {
   WidgetsFlutterBinding.ensureInitialized();
   final transport = NotificationService();
   await transport.initializeForBackgroundIsolate();
   final repositories = AppRepositories(notificationTransport: transport);
-  await repositories.notificationScheduler.handleInteraction(_toInteraction(response));
+  await repositories.notificationScheduler
+      .handleInteraction(_toInteraction(response));
 }

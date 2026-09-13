@@ -40,7 +40,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     final counts = <int, int>{};
     for (final category in categories) {
       if (category.id == null) continue;
-      final tasks = await repos.taskRepository.getAllTasks(categoryId: category.id);
+      final tasks =
+          await repos.taskRepository.getAllTasks(categoryId: category.id);
       counts[category.id!] = tasks.length;
     }
     return _CategoriesData(categories: categories, taskCounts: counts);
@@ -71,33 +72,37 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                TextFormField(
-                  controller: controller,
-                  autofocus: true,
-                  decoration: const InputDecoration(labelText: 'Name'),
-                  validator: (value) =>
-                      (value == null || value.trim().isEmpty) ? 'Name is required' : null,
+                    TextFormField(
+                      controller: controller,
+                      autofocus: true,
+                      decoration: const InputDecoration(labelText: 'Name'),
+                      validator: (value) =>
+                          (value == null || value.trim().isEmpty)
+                              ? 'Name is required'
+                              : null,
+                    ),
+                    const SizedBox(height: 16),
+                    Text('Color',
+                        style: Theme.of(dialogContext).textTheme.labelMedium),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final hex in kCategoryColorSwatches)
+                          _ColorSwatch(
+                            hex: hex,
+                            selected: selectedColorHex == hex,
+                            onTap: () =>
+                                setDialogState(() => selectedColorHex = hex),
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                Text('Color', style: Theme.of(dialogContext).textTheme.labelMedium),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final hex in kCategoryColorSwatches)
-                      _ColorSwatch(
-                        hex: hex,
-                        selected: selectedColorHex == hex,
-                        onTap: () => setDialogState(() => selectedColorHex = hex),
-                      ),
-                    ],
-                  ),
-                ],
               ),
             ),
           ),
-        ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -124,7 +129,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     if (!mounted) return;
     final repos = RepositoryScope.of(context);
     if (existing == null) {
-      await repos.categoryRepository.createCategory(name: name, color: selectedColorHex);
+      await repos.categoryRepository
+          .createCategory(name: name, color: selectedColorHex);
     } else {
       await repos.categoryRepository.updateCategory(
         existing.copyWith(name: name, color: selectedColorHex),
@@ -140,7 +146,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     // null (ON DELETE SET NULL) rather than deleting them - this look-up is
     // just so the confirmation dialog can tell the user how many tasks
     // that will affect, not to block or change the deletion itself.
-    final tasksUsingIt = await repos.taskRepository.getAllTasks(categoryId: category.id);
+    final tasksUsingIt =
+        await repos.taskRepository.getAllTasks(categoryId: category.id);
 
     if (!mounted) return;
     final confirmed = await showDialog<bool>(
@@ -169,7 +176,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 
     if (confirmed != true) return;
     if (!mounted) return;
-    await RepositoryScope.of(context).categoryRepository.deleteCategory(category.id!);
+    await RepositoryScope.of(context)
+        .categoryRepository
+        .deleteCategory(category.id!);
     if (!mounted) return;
     _reload();
   }
@@ -205,10 +214,15 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final category = categories[index];
-              final color = colorFromHex(category.color) ?? kDefaultCategoryColors[category.name];
-              final effectiveColor = color ?? Theme.of(context).colorScheme.primary;
-              final icon = kDefaultCategoryIcons[category.name] ?? kFallbackCategoryIcon;
-              final count = category.id == null ? 0 : (data.taskCounts[category.id!] ?? 0);
+              final color = colorFromHex(category.color) ??
+                  kDefaultCategoryColors[category.name];
+              final effectiveColor =
+                  color ?? Theme.of(context).colorScheme.primary;
+              final icon =
+                  kDefaultCategoryIcons[category.name] ?? kFallbackCategoryIcon;
+              final count = category.id == null
+                  ? 0
+                  : (data.taskCounts[category.id!] ?? 0);
               return Card(
                 child: ListTile(
                   leading: Container(
@@ -216,7 +230,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                     height: 44,
                     decoration: BoxDecoration(
                       color: effectiveColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
+                      borderRadius:
+                          BorderRadius.circular(AppSpacing.radiusControl),
                     ),
                     alignment: Alignment.center,
                     child: Icon(icon, color: effectiveColor),
@@ -226,13 +241,16 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   trailing: PopupMenuButton<String>(
                     tooltip: 'Category options',
                     onSelected: (value) {
-                      if (value == 'edit') _showCategoryDialog(existing: category);
+                      if (value == 'edit')
+                        _showCategoryDialog(existing: category);
                       if (value == 'delete') _confirmDelete(category);
                     },
                     itemBuilder: (context) => [
-                      const PopupMenuItem(value: 'edit', child: Text('Rename / recolor')),
+                      const PopupMenuItem(
+                          value: 'edit', child: Text('Rename / recolor')),
                       if (!category.isDefault)
-                        const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                        const PopupMenuItem(
+                            value: 'delete', child: Text('Delete')),
                     ],
                   ),
                 ),
@@ -251,7 +269,8 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 }
 
 class _ColorSwatch extends StatelessWidget {
-  const _ColorSwatch({required this.hex, required this.selected, required this.onTap});
+  const _ColorSwatch(
+      {required this.hex, required this.selected, required this.onTap});
 
   final String hex;
   final bool selected;
@@ -259,7 +278,8 @@ class _ColorSwatch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = colorFromHex(hex) ?? Theme.of(context).colorScheme.secondaryContainer;
+    final color =
+        colorFromHex(hex) ?? Theme.of(context).colorScheme.secondaryContainer;
     return InkWell(
       onTap: onTap,
       customBorder: const CircleBorder(),
@@ -267,7 +287,9 @@ class _ColorSwatch extends StatelessWidget {
         width: 32,
         height: 32,
         decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        child: selected ? const Icon(Icons.check, color: Colors.white, size: 18) : null,
+        child: selected
+            ? const Icon(Icons.check, color: Colors.white, size: 18)
+            : null,
       ),
     );
   }

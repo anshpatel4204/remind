@@ -35,14 +35,17 @@ void main() {
       TaskDataSource(testDb.appDatabase),
       TaskTagDataSource(testDb.appDatabase),
     );
-    reminderRepository = ReminderRepository(ReminderDataSource(testDb.appDatabase));
-    recurrenceRepository = RecurrenceRepository(RecurrenceRuleDataSource(testDb.appDatabase));
+    reminderRepository =
+        ReminderRepository(ReminderDataSource(testDb.appDatabase));
+    recurrenceRepository =
+        RecurrenceRepository(RecurrenceRuleDataSource(testDb.appDatabase));
     reminderEngine = ReminderEngine(
       taskRepository: taskRepository,
       reminderRepository: reminderRepository,
       recurrenceRepository: recurrenceRepository,
     );
-    settingsRepository = SettingsRepository(SettingsDataSource(testDb.appDatabase));
+    settingsRepository =
+        SettingsRepository(SettingsDataSource(testDb.appDatabase));
     transport = FakeNotificationTransport();
     scheduler = NotificationScheduler(
       transport: transport,
@@ -56,7 +59,9 @@ void main() {
   tearDown(() => testDb.tearDown());
 
   group('scheduling', () {
-    test('schedules a one-time notification carrying the task title/description/time/actions', () async {
+    test(
+        'schedules a one-time notification carrying the task title/description/time/actions',
+        () async {
       final task = await taskRepository.createTask(
         title: 'Pay rent',
         description: 'Due at the start of the month',
@@ -85,7 +90,8 @@ void main() {
       expect(persisted?.notificationId, reminder.id);
     });
 
-    test('multiple reminders schedule independently under distinct ids', () async {
+    test('multiple reminders schedule independently under distinct ids',
+        () async {
       final taskA = await taskRepository.createTask(title: 'Task A');
       final taskB = await taskRepository.createTask(title: 'Task B');
 
@@ -99,14 +105,17 @@ void main() {
       );
 
       expect(reminderA.id, isNot(reminderB.id));
-      expect(transport.scheduled.keys, containsAll(<int>[reminderA.id!, reminderB.id!]));
+      expect(transport.scheduled.keys,
+          containsAll(<int>[reminderA.id!, reminderB.id!]));
       expect(transport.scheduled[reminderA.id]!.title, 'Task A');
       expect(transport.scheduled[reminderB.id]!.title, 'Task B');
     });
   });
 
   group('cancel / reschedule (duplicate prevention)', () {
-    test('cancelReminder cancels the notification and disables the reminder row', () async {
+    test(
+        'cancelReminder cancels the notification and disables the reminder row',
+        () async {
       final task = await taskRepository.createTask(title: 'Water plants');
       final reminder = await scheduler.createAndScheduleReminder(
         taskId: task.id!,
@@ -120,7 +129,9 @@ void main() {
       expect(persisted?.isEnabled, isFalse);
     });
 
-    test('rescheduling cancels the old notification before scheduling the new one', () async {
+    test(
+        'rescheduling cancels the old notification before scheduling the new one',
+        () async {
       final task = await taskRepository.createTask(title: 'Call the bank');
       final reminder = await scheduler.createAndScheduleReminder(
         taskId: task.id!,
@@ -128,12 +139,16 @@ void main() {
       );
       transport.calls.clear();
 
-      await scheduler.updateAndRescheduleReminder(reminder.id!, DateTime(2026, 9, 16, 9, 0));
+      await scheduler.updateAndRescheduleReminder(
+          reminder.id!, DateTime(2026, 9, 16, 9, 0));
 
-      expect(transport.calls, ['cancel:${reminder.id}', 'schedule:${reminder.id}']);
+      expect(transport.calls,
+          ['cancel:${reminder.id}', 'schedule:${reminder.id}']);
       // Exactly one notification remains for this reminder - never two.
-      expect(transport.scheduled.keys.where((id) => id == reminder.id), hasLength(1));
-      expect(transport.scheduled[reminder.id]!.scheduledTime, DateTime(2026, 9, 16, 9, 0));
+      expect(transport.scheduled.keys.where((id) => id == reminder.id),
+          hasLength(1));
+      expect(transport.scheduled[reminder.id]!.scheduledTime,
+          DateTime(2026, 9, 16, 9, 0));
     });
   });
 
@@ -160,13 +175,17 @@ void main() {
 
       for (final entry in cases.entries) {
         final reminderId = await createReminder();
-        final snoozed = await scheduler.snoozeReminder(reminderId, option: entry.key, now: now);
-        expect(snoozed?.snoozedUntil, now.add(entry.value), reason: '${entry.key}');
-        expect(transport.scheduled[reminderId]!.scheduledTime, now.add(entry.value));
+        final snoozed = await scheduler.snoozeReminder(reminderId,
+            option: entry.key, now: now);
+        expect(snoozed?.snoozedUntil, now.add(entry.value),
+            reason: '${entry.key}');
+        expect(transport.scheduled[reminderId]!.scheduledTime,
+            now.add(entry.value));
       }
     });
 
-    test('tomorrow snoozes to the same time on the next calendar day', () async {
+    test('tomorrow snoozes to the same time on the next calendar day',
+        () async {
       final reminderId = await createReminder();
       final snoozed = await scheduler.snoozeReminder(
         reminderId,
@@ -190,16 +209,20 @@ void main() {
     test('custom without a duration is rejected', () async {
       final reminderId = await createReminder();
       expect(
-        () => scheduler.snoozeReminder(reminderId, option: SnoozeOption.custom, now: now),
+        () => scheduler.snoozeReminder(reminderId,
+            option: SnoozeOption.custom, now: now),
         throwsArgumentError,
       );
     });
 
-    test('snoozing cancels the previous notification and reschedules under the same id', () async {
+    test(
+        'snoozing cancels the previous notification and reschedules under the same id',
+        () async {
       final reminderId = await createReminder();
       transport.calls.clear();
 
-      await scheduler.snoozeReminder(reminderId, option: SnoozeOption.tenMinutes, now: now);
+      await scheduler.snoozeReminder(reminderId,
+          option: SnoozeOption.tenMinutes, now: now);
 
       expect(transport.calls, ['cancel:$reminderId', 'schedule:$reminderId']);
     });
@@ -212,7 +235,8 @@ void main() {
       expect(result, isTrue);
     });
 
-    test('requests permission when not yet enabled, and reflects a denial', () async {
+    test('requests permission when not yet enabled, and reflects a denial',
+        () async {
       transport.notificationsEnabled = false;
       transport.grantPermissionOnRequest = false;
 
@@ -221,7 +245,8 @@ void main() {
       expect(result, isFalse);
     });
 
-    test('requests permission when not yet enabled, and reflects a grant', () async {
+    test('requests permission when not yet enabled, and reflects a grant',
+        () async {
       transport.notificationsEnabled = false;
       transport.grantPermissionOnRequest = true;
 
@@ -232,7 +257,9 @@ void main() {
   });
 
   group('notification actions', () {
-    test('Complete on a non-recurring task cancels its notification and completes the task', () async {
+    test(
+        'Complete on a non-recurring task cancels its notification and completes the task',
+        () async {
       final task = await taskRepository.createTask(title: 'Read a chapter');
       final reminder = await scheduler.createAndScheduleReminder(
         taskId: task.id!,
@@ -251,7 +278,9 @@ void main() {
       expect(persistedTask?.status, TaskStatus.completed);
     });
 
-    test('Complete on a recurring task reschedules the reminder for the next occurrence', () async {
+    test(
+        'Complete on a recurring task reschedules the reminder for the next occurrence',
+        () async {
       final rule = await recurrenceRepository.createRule(
         frequency: RecurrenceFrequency.daily,
         startDate: DateTime(2026, 1, 1, 9, 0),
@@ -279,7 +308,8 @@ void main() {
 
       // The same reminder id is still the one scheduled - rolled forward,
       // not duplicated.
-      expect(transport.scheduled[reminder.id]!.scheduledTime, DateTime(2026, 1, 2, 9, 0));
+      expect(transport.scheduled[reminder.id]!.scheduledTime,
+          DateTime(2026, 1, 2, 9, 0));
     });
 
     test('Snooze applies the default duration', () async {
@@ -290,7 +320,9 @@ void main() {
       );
 
       await scheduler.handleInteraction(
-        NotificationInteraction(notificationId: reminder.id!, actionId: NotificationActionIds.snooze),
+        NotificationInteraction(
+            notificationId: reminder.id!,
+            actionId: NotificationActionIds.snooze),
       );
 
       final persisted = await reminderRepository.getReminder(reminder.id!);
@@ -298,7 +330,8 @@ void main() {
       expect(persisted?.snoozedUntil, isNotNull);
     });
 
-    test('Dismiss cancels the notification without completing the task', () async {
+    test('Dismiss cancels the notification without completing the task',
+        () async {
       final task = await taskRepository.createTask(title: 'Something optional');
       final reminder = await scheduler.createAndScheduleReminder(
         taskId: task.id!,
@@ -306,7 +339,9 @@ void main() {
       );
 
       await scheduler.handleInteraction(
-        NotificationInteraction(notificationId: reminder.id!, actionId: NotificationActionIds.dismiss),
+        NotificationInteraction(
+            notificationId: reminder.id!,
+            actionId: NotificationActionIds.dismiss),
       );
 
       expect(transport.scheduled.containsKey(reminder.id), isFalse);
@@ -314,21 +349,25 @@ void main() {
       expect(persistedTask?.status, TaskStatus.pending);
     });
 
-    test('a plain tap (no action) leaves the notification and task untouched', () async {
+    test('a plain tap (no action) leaves the notification and task untouched',
+        () async {
       final task = await taskRepository.createTask(title: 'Just a tap');
       final reminder = await scheduler.createAndScheduleReminder(
         taskId: task.id!,
         reminderTime: DateTime(2026, 9, 15, 9, 0),
       );
 
-      await scheduler.handleInteraction(NotificationInteraction(notificationId: reminder.id!));
+      await scheduler.handleInteraction(
+          NotificationInteraction(notificationId: reminder.id!));
 
       expect(transport.scheduled.containsKey(reminder.id), isTrue);
       final persistedTask = await taskRepository.getTask(task.id!);
       expect(persistedTask?.status, TaskStatus.pending);
     });
 
-    test('routes through the transport-registered callback exactly as the OS would deliver it', () async {
+    test(
+        'routes through the transport-registered callback exactly as the OS would deliver it',
+        () async {
       await scheduler.initialize();
       final task = await taskRepository.createTask(title: 'Via callback');
       final reminder = await scheduler.createAndScheduleReminder(
@@ -337,7 +376,9 @@ void main() {
       );
 
       await transport.simulateInteraction(
-        NotificationInteraction(notificationId: reminder.id!, actionId: NotificationActionIds.dismiss),
+        NotificationInteraction(
+            notificationId: reminder.id!,
+            actionId: NotificationActionIds.dismiss),
       );
 
       expect(transport.scheduled.containsKey(reminder.id), isFalse);
@@ -345,8 +386,11 @@ void main() {
   });
 
   group('task-level operations', () {
-    test('completeTask cancels the notification for every reminder on that task', () async {
-      final task = await taskRepository.createTask(title: 'Multi-reminder task');
+    test(
+        'completeTask cancels the notification for every reminder on that task',
+        () async {
+      final task =
+          await taskRepository.createTask(title: 'Multi-reminder task');
       final reminder = await scheduler.createAndScheduleReminder(
         taskId: task.id!,
         reminderTime: DateTime(2026, 9, 15, 9, 0),
@@ -359,8 +403,10 @@ void main() {
       expect(persistedTask?.status, TaskStatus.completed);
     });
 
-    test('cancelNotificationsForTask cancels without touching the reminder row', () async {
-      final task = await taskRepository.createTask(title: 'About to be deleted');
+    test('cancelNotificationsForTask cancels without touching the reminder row',
+        () async {
+      final task =
+          await taskRepository.createTask(title: 'About to be deleted');
       final reminder = await scheduler.createAndScheduleReminder(
         taskId: task.id!,
         reminderTime: DateTime(2026, 9, 15, 9, 0),
@@ -377,7 +423,9 @@ void main() {
   });
 
   group('startup reconciliation', () {
-    test('schedules an enabled, future reminder missing from pending notifications', () async {
+    test(
+        'schedules an enabled, future reminder missing from pending notifications',
+        () async {
       final task = await taskRepository.createTask(title: 'Missed by the OS');
       final reminder = await reminderRepository.createReminder(
         taskId: task.id!,
@@ -391,7 +439,8 @@ void main() {
       expect(transport.scheduled.containsKey(reminder.id), isTrue);
     });
 
-    test('does not schedule a reminder whose time has already passed', () async {
+    test('does not schedule a reminder whose time has already passed',
+        () async {
       final task = await taskRepository.createTask(title: 'Missed entirely');
       final reminder = await reminderRepository.createReminder(
         taskId: task.id!,
@@ -403,7 +452,8 @@ void main() {
       expect(transport.scheduled.containsKey(reminder.id), isFalse);
     });
 
-    test('a recurring reminder missed for days catches up to the next future '
+    test(
+        'a recurring reminder missed for days catches up to the next future '
         'occurrence and schedules that instead of every missed one', () async {
       final rule = await recurrenceRepository.createRule(
         frequency: RecurrenceFrequency.daily,
@@ -433,7 +483,8 @@ void main() {
       expect(persistedTask?.dueDate, DateTime(2026, 1, 7, 8, 0));
     });
 
-    test('a recurring reminder whose recurrence ended during the missed time '
+    test(
+        'a recurring reminder whose recurrence ended during the missed time '
         'is disabled rather than left stuck in the past', () async {
       final rule = await recurrenceRepository.createRule(
         frequency: RecurrenceFrequency.daily,
@@ -453,11 +504,14 @@ void main() {
       await scheduler.reconcileAfterStartup(now: DateTime(2026, 1, 10, 0, 0));
 
       expect(transport.scheduled, isEmpty);
-      final persistedReminder = await reminderRepository.getReminder(reminder.id!);
+      final persistedReminder =
+          await reminderRepository.getReminder(reminder.id!);
       expect(persistedReminder?.isEnabled, isFalse);
     });
 
-    test('cancels a stray pending notification with no matching enabled reminder', () async {
+    test(
+        'cancels a stray pending notification with no matching enabled reminder',
+        () async {
       // Nothing in the database corresponds to this id - as if a reminder
       // had been deleted by some path that didn't go through the
       // scheduler.
@@ -475,7 +529,9 @@ void main() {
   });
 
   group('in-app notification settings', () {
-    test('sound/vibration default to on and are passed through to the transport', () async {
+    test(
+        'sound/vibration default to on and are passed through to the transport',
+        () async {
       expect(await scheduler.soundEnabled(), isTrue);
       expect(await scheduler.vibrationEnabled(), isTrue);
 
@@ -490,7 +546,9 @@ void main() {
       expect(scheduled.vibrationEnabled, isTrue);
     });
 
-    test('turning sound/vibration off is reflected in the next scheduled notification', () async {
+    test(
+        'turning sound/vibration off is reflected in the next scheduled notification',
+        () async {
       await scheduler.setSoundEnabled(false);
       await scheduler.setVibrationEnabled(false);
 
@@ -509,7 +567,9 @@ void main() {
       expect(await scheduler.notificationsMasterEnabled(), isTrue);
     });
 
-    test('turning the master switch off cancels everything and stops new scheduling', () async {
+    test(
+        'turning the master switch off cancels everything and stops new scheduling',
+        () async {
       final task = await taskRepository.createTask(title: 'Water the plants');
       final reminder = await scheduler.createAndScheduleReminder(
         taskId: task.id!,
@@ -534,7 +594,8 @@ void main() {
       expect(transport.scheduled.containsKey(another.id), isFalse);
     });
 
-    test('turning the master switch back on re-schedules what should be active', () async {
+    test('turning the master switch back on re-schedules what should be active',
+        () async {
       final task = await taskRepository.createTask(title: 'Water the plants');
       final reminder = await scheduler.createAndScheduleReminder(
         taskId: task.id!,
@@ -548,7 +609,9 @@ void main() {
       expect(transport.scheduled.containsKey(reminder.id), isTrue);
     });
 
-    test('default snooze option defaults to 10 minutes and is used by the notification Snooze action', () async {
+    test(
+        'default snooze option defaults to 10 minutes and is used by the notification Snooze action',
+        () async {
       await scheduler.initialize();
       expect(await scheduler.defaultSnoozeOption(), SnoozeOption.tenMinutes);
 
@@ -559,14 +622,18 @@ void main() {
       );
 
       await transport.simulateInteraction(
-        NotificationInteraction(notificationId: reminder.id!, actionId: NotificationActionIds.snooze),
+        NotificationInteraction(
+            notificationId: reminder.id!,
+            actionId: NotificationActionIds.snooze),
       );
 
       final snoozed = await reminderRepository.getReminder(reminder.id!);
       expect(snoozed?.snoozeMinutes, 10);
     });
 
-    test('changing the default snooze option changes what the notification Snooze action applies', () async {
+    test(
+        'changing the default snooze option changes what the notification Snooze action applies',
+        () async {
       await scheduler.initialize();
       await scheduler.setDefaultSnoozeOption(SnoozeOption.thirtyMinutes);
 
@@ -577,7 +644,9 @@ void main() {
       );
 
       await transport.simulateInteraction(
-        NotificationInteraction(notificationId: reminder.id!, actionId: NotificationActionIds.snooze),
+        NotificationInteraction(
+            notificationId: reminder.id!,
+            actionId: NotificationActionIds.snooze),
       );
 
       final snoozed = await reminderRepository.getReminder(reminder.id!);

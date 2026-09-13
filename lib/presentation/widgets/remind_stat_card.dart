@@ -30,7 +30,8 @@ class REmindStatCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md + 2, vertical: AppSpacing.sm + 2),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md + 2, vertical: AppSpacing.sm + 2),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -51,7 +52,10 @@ class REmindStatCard extends StatelessWidget {
               ],
               Text(
                 '$count',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.bold),
               ),
               Text(
                 label,

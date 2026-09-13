@@ -54,7 +54,8 @@ class StatisticsData {
   double get completionRate => total == 0 ? 0 : completed / total;
 
   List<MapEntry<int?, int>> sortedCategoryCounts() {
-    final entries = byCategory.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final entries = byCategory.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
     return entries;
   }
 }
@@ -69,7 +70,8 @@ class StatisticsData {
 class StatisticsCalculator {
   const StatisticsCalculator._();
 
-  static StatisticsData compute(List<TaskModel> tasks, {required DateTime now}) {
+  static StatisticsData compute(List<TaskModel> tasks,
+      {required DateTime now}) {
     final today = DateTime(now.year, now.month, now.day);
 
     var completed = 0;
@@ -81,7 +83,9 @@ class StatisticsCalculator {
     var completedThisWeek = 0;
     var completedThisMonth = 0;
 
-    final byPriority = <TaskPriority, int>{for (final p in TaskPriority.values) p: 0};
+    final byPriority = <TaskPriority, int>{
+      for (final p in TaskPriority.values) p: 0
+    };
     final byCategory = <int?, int>{};
 
     // Monday-start week containing `today`, for the "completed this week"
@@ -112,7 +116,8 @@ class StatisticsCalculator {
           if (!completedAt.isBefore(monthStart)) {
             completedThisMonth++;
           }
-          final completedDay = DateTime(completedAt.year, completedAt.month, completedAt.day);
+          final completedDay =
+              DateTime(completedAt.year, completedAt.month, completedAt.day);
           final dayIndex = completedDay.difference(chartStart).inDays;
           if (dayIndex >= 0 && dayIndex < 7) {
             completedPerDay[dayIndex]++;

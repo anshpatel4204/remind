@@ -18,8 +18,10 @@ void main() {
   setUp(() {
     testDb = TestAppDatabase.create();
     final taskTagDataSource = TaskTagDataSource(testDb.appDatabase);
-    repository = TagRepository(TagDataSource(testDb.appDatabase), taskTagDataSource);
-    taskRepository = TaskRepository(TaskDataSource(testDb.appDatabase), taskTagDataSource);
+    repository =
+        TagRepository(TagDataSource(testDb.appDatabase), taskTagDataSource);
+    taskRepository =
+        TaskRepository(TaskDataSource(testDb.appDatabase), taskTagDataSource);
   });
 
   tearDown(() => testDb.tearDown());
@@ -29,7 +31,8 @@ void main() {
   });
 
   test('create, read, update, and delete a tag', () async {
-    final created = await repository.createTag(name: 'urgent', color: '#FF0000');
+    final created =
+        await repository.createTag(name: 'urgent', color: '#FF0000');
     expect(created.id, isNotNull);
 
     final fetched = await repository.getTag(created.id!);
@@ -46,7 +49,8 @@ void main() {
   group('deleting a tag used by tasks', () {
     test('removes it from the task without deleting the task', () async {
       final tag = await repository.createTag(name: 'blocked');
-      final task = await taskRepository.createTask(title: 'Waiting on review', tagIds: [tag.id!]);
+      final task = await taskRepository
+          .createTask(title: 'Waiting on review', tagIds: [tag.id!]);
 
       expect(await taskRepository.getTagsForTask(task.id!), hasLength(1));
 

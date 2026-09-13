@@ -60,6 +60,7 @@ class ReminderDataSource {
 
   Future<int> delete(int id) async {
     final Database db = await _appDatabase.database;
-    return db.delete(RemindersTable.name, where: '${RemindersTable.id} = ?', whereArgs: [id]);
+    return db.delete(RemindersTable.name,
+        where: '${RemindersTable.id} = ?', whereArgs: [id]);
   }
 }

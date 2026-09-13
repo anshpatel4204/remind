@@ -19,7 +19,15 @@ final DateFormat _monthFormat = DateFormat('MMMM yyyy');
 final DateFormat _dayHeaderFormat = DateFormat('EEEE, MMM d');
 final DateFormat _weekEndpointFormat = DateFormat('MMM d');
 final DateFormat _weekEndpointFormatWithYear = DateFormat('MMM d, yyyy');
-const List<String> _weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const List<String> _weekdayLabels = [
+  'Mon',
+  'Tue',
+  'Wed',
+  'Thu',
+  'Fri',
+  'Sat',
+  'Sun'
+];
 
 /// Which range the Calendar tab is currently showing.
 enum _CalendarViewMode { day, week, month }
@@ -83,12 +91,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
         return (from, to);
       case _CalendarViewMode.week:
         final from = _visibleWeekStart;
-        final to = _visibleWeekStart.add(const Duration(days: 7)).subtract(const Duration(milliseconds: 1));
+        final to = _visibleWeekStart
+            .add(const Duration(days: 7))
+            .subtract(const Duration(milliseconds: 1));
         return (from, to);
       case _CalendarViewMode.day:
         final day = _selectedDay ?? _dateOnly(DateTime.now());
         final from = day;
-        final to = day.add(const Duration(days: 1)).subtract(const Duration(milliseconds: 1));
+        final to = day
+            .add(const Duration(days: 1))
+            .subtract(const Duration(milliseconds: 1));
         return (from, to);
     }
   }
@@ -96,9 +108,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Future<_CalendarData> _load() async {
     final repos = RepositoryScope.of(context);
     final (from, to) = _visibleRange();
-    final tasks = await repos.taskRepository.getAllTasks(dueDateFrom: from, dueDateTo: to);
+    final tasks = await repos.taskRepository
+        .getAllTasks(dueDateFrom: from, dueDateTo: to);
     final categories = await repos.categoryRepository.getAllCategories();
-    final categoryById = {for (final c in categories) if (c.id != null) c.id!: c};
+    final categoryById = {
+      for (final c in categories)
+        if (c.id != null) c.id!: c
+    };
 
     final now = DateTime.now();
     final tagsByTaskId = <int, List<TagModel>>{};
@@ -111,7 +127,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
       final reminders = await repos.reminderRepository.getRemindersForTask(id);
       remindersByTaskId[id] = reminders;
       final hasActiveSnooze = reminders.any(
-        (r) => r.isEnabled && r.snoozedUntil != null && r.snoozedUntil!.isAfter(now),
+        (r) =>
+            r.isEnabled &&
+            r.snoozedUntil != null &&
+            r.snoozedUntil!.isAfter(now),
       );
       if (hasActiveSnooze) activeSnoozeTaskIds.add(id);
       final day = _dateOnly(task.dueDate!);
@@ -165,7 +184,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
     setState(() {
       _visibleWeekStart = _visibleWeekStart.add(Duration(days: 7 * delta));
       final weekEnd = _visibleWeekStart.add(const Duration(days: 6));
-      if (_selectedDay == null || _selectedDay!.isBefore(_visibleWeekStart) || _selectedDay!.isAfter(weekEnd)) {
+      if (_selectedDay == null ||
+          _selectedDay!.isBefore(_visibleWeekStart) ||
+          _selectedDay!.isAfter(weekEnd)) {
         _selectedDay = null;
       }
       _future = _load();
@@ -174,7 +195,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   void _changeDay(int delta) {
     setState(() {
-      _selectedDay = (_selectedDay ?? _dateOnly(DateTime.now())).add(Duration(days: delta));
+      _selectedDay = (_selectedDay ?? _dateOnly(DateTime.now()))
+          .add(Duration(days: delta));
       _future = _load();
     });
   }
@@ -197,7 +219,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   Future<void> _openAddTask() async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => TaskFormScreen(initialDueDate: _selectedDay)),
+      MaterialPageRoute(
+          builder: (_) => TaskFormScreen(initialDueDate: _selectedDay)),
     );
     _reload();
   }
@@ -227,7 +250,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Future<void> _togglePin(TaskModel task) async {
-    await RepositoryScope.of(context).taskRepository.setPinned(task.id!, !task.isPinned);
+    await RepositoryScope.of(context)
+        .taskRepository
+        .setPinned(task.id!, !task.isPinned);
     _reload();
   }
 
@@ -236,7 +261,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete task?'),
-        content: Text('"${task.title}" will be permanently deleted, along with its reminder.'),
+        content: Text(
+            '"${task.title}" will be permanently deleted, along with its reminder.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -311,8 +337,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
             return const REmindLoadingState();
           }
           final data = snapshot.data!;
-          final selectedTasks =
-              _selectedDay == null ? const <TaskModel>[] : (data.tasksByDay[_selectedDay!] ?? const []);
+          final selectedTasks = _selectedDay == null
+              ? const <TaskModel>[]
+              : (data.tasksByDay[_selectedDay!] ?? const []);
 
           // Enabled reminders for the selected day's tasks, earliest first -
           // real reminder data (not fabricated), reusing what _load() has
@@ -324,7 +351,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
               if (reminder.isEnabled) dayReminders.add((task, reminder));
             }
           }
-          dayReminders.sort((a, b) => a.$2.reminderTime.compareTo(b.$2.reminderTime));
+          dayReminders
+              .sort((a, b) => a.$2.reminderTime.compareTo(b.$2.reminderTime));
 
           return Column(
             children: [
@@ -332,12 +360,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                 child: SegmentedButton<_CalendarViewMode>(
                   segments: const [
-                    ButtonSegment(value: _CalendarViewMode.day, label: Text('Day')),
-                    ButtonSegment(value: _CalendarViewMode.week, label: Text('Week')),
-                    ButtonSegment(value: _CalendarViewMode.month, label: Text('Month')),
+                    ButtonSegment(
+                        value: _CalendarViewMode.day, label: Text('Day')),
+                    ButtonSegment(
+                        value: _CalendarViewMode.week, label: Text('Week')),
+                    ButtonSegment(
+                        value: _CalendarViewMode.month, label: Text('Month')),
                   ],
                   selected: {_viewMode},
-                  onSelectionChanged: (selection) => _setViewMode(selection.first),
+                  onSelectionChanged: (selection) =>
+                      _setViewMode(selection.first),
                 ),
               ),
               Padding(
@@ -392,22 +424,28 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           // row above (for all three view modes) - no need
                           // to repeat it here too.
                           if (dayReminders.isNotEmpty) ...[
-                            Text('Reminders', style: Theme.of(context).textTheme.labelLarge),
+                            Text('Reminders',
+                                style: Theme.of(context).textTheme.labelLarge),
                             const SizedBox(height: 6),
                             for (final (task, reminder) in dayReminders)
                               Card(
                                 margin: const EdgeInsets.only(bottom: 8),
                                 child: ListTile(
                                   dense: true,
-                                  leading: const Icon(Icons.notifications_outlined),
-                                  title: Text(task.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                                  trailing: Text(formatTime(reminder.reminderTime)),
+                                  leading:
+                                      const Icon(Icons.notifications_outlined),
+                                  title: Text(task.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis),
+                                  trailing:
+                                      Text(formatTime(reminder.reminderTime)),
                                   onTap: () => _openDetails(task),
                                 ),
                               ),
                             const SizedBox(height: 12),
                           ],
-                          Text('Tasks', style: Theme.of(context).textTheme.labelLarge),
+                          Text('Tasks',
+                              style: Theme.of(context).textTheme.labelLarge),
                           const SizedBox(height: 6),
                           if (selectedTasks.isEmpty)
                             const REmindEmptyState(
@@ -419,10 +457,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             for (final task in selectedTasks)
                               TaskListTile(
                                 task: task,
-                                category:
-                                    task.categoryId == null ? null : data.categoryById[task.categoryId],
+                                category: task.categoryId == null
+                                    ? null
+                                    : data.categoryById[task.categoryId],
                                 tags: data.tagsByTaskId[task.id] ?? const [],
-                                hasActiveSnooze: data.activeSnoozeTaskIds.contains(task.id),
+                                hasActiveSnooze:
+                                    data.activeSnoozeTaskIds.contains(task.id),
                                 onTap: () => _openDetails(task),
                                 onToggleComplete: () => _toggleComplete(task),
                                 onTogglePin: () => _togglePin(task),
@@ -532,7 +572,9 @@ class _DayCell extends StatelessWidget {
                   color: isSelected
                       ? Theme.of(context).colorScheme.onPrimary
                       : Theme.of(context).colorScheme.onSurface,
-                  fontWeight: isToday || isSelected ? FontWeight.bold : FontWeight.normal,
+                  fontWeight: isToday || isSelected
+                      ? FontWeight.bold
+                      : FontWeight.normal,
                 ),
               ),
               const SizedBox(height: 2),
@@ -574,7 +616,8 @@ class _MonthGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final daysInMonth = DateTime(visibleMonth.year, visibleMonth.month + 1, 0).day;
+    final daysInMonth =
+        DateTime(visibleMonth.year, visibleMonth.month + 1, 0).day;
     final leadingBlanks = visibleMonth.weekday - 1;
     final totalCells = leadingBlanks + daysInMonth;
     final trailingBlanks = (7 - totalCells % 7) % 7;
@@ -587,7 +630,8 @@ class _MonthGrid extends StatelessWidget {
     // taller than the whole screen. Deriving the aspect ratio from the
     // available width instead caps each row at a fixed, comfortable height
     // regardless of how wide the grid is.
-    const horizontalGridPadding = 8.0; // matches the GridView's own padding below
+    const horizontalGridPadding =
+        8.0; // matches the GridView's own padding below
     const desiredCellHeight = 44.0;
 
     return LayoutBuilder(
@@ -608,7 +652,8 @@ class _MonthGrid extends StatelessWidget {
             final day = index - leadingBlanks + 1;
             if (day < 1 || day > daysInMonth) return const SizedBox.shrink();
 
-            final cellDate = DateTime(visibleMonth.year, visibleMonth.month, day);
+            final cellDate =
+                DateTime(visibleMonth.year, visibleMonth.month, day);
             return _DayCell(
               date: cellDate,
               label: '$day',

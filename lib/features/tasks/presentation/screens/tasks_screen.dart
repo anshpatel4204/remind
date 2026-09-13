@@ -64,7 +64,10 @@ class _TasksScreenState extends State<TasksScreen> {
     final tasks = await repos.taskRepository.getFilteredTasks(_filter);
     final categories = await repos.categoryRepository.getAllCategories();
     final tags = await repos.tagRepository.getAllTags();
-    final categoryById = {for (final c in categories) if (c.id != null) c.id!: c};
+    final categoryById = {
+      for (final c in categories)
+        if (c.id != null) c.id!: c
+    };
 
     final now = DateTime.now();
     final tagsByTaskId = <int, List<TagModel>>{};
@@ -74,7 +77,10 @@ class _TasksScreenState extends State<TasksScreen> {
       tagsByTaskId[id] = await repos.taskRepository.getTagsForTask(id);
       final reminders = await repos.reminderRepository.getRemindersForTask(id);
       final hasActiveSnooze = reminders.any(
-        (r) => r.isEnabled && r.snoozedUntil != null && r.snoozedUntil!.isAfter(now),
+        (r) =>
+            r.isEnabled &&
+            r.snoozedUntil != null &&
+            r.snoozedUntil!.isAfter(now),
       );
       if (hasActiveSnooze) activeSnoozeTaskIds.add(id);
     }
@@ -131,7 +137,9 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Future<void> _togglePin(TaskModel task) async {
-    await RepositoryScope.of(context).taskRepository.setPinned(task.id!, !task.isPinned);
+    await RepositoryScope.of(context)
+        .taskRepository
+        .setPinned(task.id!, !task.isPinned);
     _reload();
   }
 
@@ -140,7 +148,8 @@ class _TasksScreenState extends State<TasksScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete task?'),
-        content: Text('"${task.title}" will be permanently deleted, along with its reminder.'),
+        content: Text(
+            '"${task.title}" will be permanently deleted, along with its reminder.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -201,7 +210,8 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Future<void> _openSearch() async {
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SearchScreen()));
+    await Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const SearchScreen()));
     _reload();
   }
 
@@ -221,7 +231,9 @@ class _TasksScreenState extends State<TasksScreen> {
             builder: (context, snapshot) {
               final data = snapshot.data;
               return IconButton(
-                icon: Icon(_filter.hasActiveFilters ? Icons.filter_alt : Icons.filter_alt_outlined),
+                icon: Icon(_filter.hasActiveFilters
+                    ? Icons.filter_alt
+                    : Icons.filter_alt_outlined),
                 tooltip: 'Filter & sort',
                 onPressed: data == null ? null : () => _openFilterSheet(data),
               );
@@ -234,7 +246,8 @@ class _TasksScreenState extends State<TasksScreen> {
               if (value == 'tags') _openManage(const TagsScreen());
             },
             itemBuilder: (context) => const [
-              PopupMenuItem(value: 'categories', child: Text('Manage categories')),
+              PopupMenuItem(
+                  value: 'categories', child: Text('Manage categories')),
               PopupMenuItem(value: 'tags', child: Text('Manage tags')),
             ],
           ),
@@ -277,8 +290,9 @@ class _TasksScreenState extends State<TasksScreen> {
                     for (final preset in TaskFilterPresets.quickList) ...[
                       _QuickDateChip(
                         label: preset.$1,
-                        selected: _filter.dueDateFilter == preset.$2.dueDateFilter &&
-                            _filter.status == preset.$2.status,
+                        selected:
+                            _filter.dueDateFilter == preset.$2.dueDateFilter &&
+                                _filter.status == preset.$2.status,
                         onTap: () => _applyPreset(preset.$2),
                       ),
                       const SizedBox(width: 8),
@@ -294,9 +308,11 @@ class _TasksScreenState extends State<TasksScreen> {
                       const Icon(Icons.filter_alt, size: 16),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: Text('Filters active', style: Theme.of(context).textTheme.labelSmall),
+                        child: Text('Filters active',
+                            style: Theme.of(context).textTheme.labelSmall),
                       ),
-                      TextButton(onPressed: _clearFilters, child: const Text('Clear')),
+                      TextButton(
+                          onPressed: _clearFilters, child: const Text('Clear')),
                     ],
                   ),
                 ),
@@ -306,7 +322,8 @@ class _TasksScreenState extends State<TasksScreen> {
                         ? REmindEmptyState(
                             icon: Icons.filter_alt_outlined,
                             title: 'No tasks match these filters',
-                            message: 'Try a different filter, or clear them to see everything.',
+                            message:
+                                'Try a different filter, or clear them to see everything.',
                             actionLabel: 'Clear filters',
                             onAction: _clearFilters,
                           )
@@ -318,29 +335,30 @@ class _TasksScreenState extends State<TasksScreen> {
                             onAction: _openAddTask,
                           ))
                     : RefreshIndicator(
-                            onRefresh: () async => _reload(),
-                            child: ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
-                              itemCount: data.tasks.length,
-                              itemBuilder: (context, index) {
-                                final task = data.tasks[index];
-                                final category = task.categoryId == null
-                                    ? null
-                                    : data.categoryById[task.categoryId];
-                                return TaskListTile(
-                                  task: task,
-                                  category: category,
-                                  tags: data.tagsByTaskId[task.id] ?? const [],
-                                  hasActiveSnooze: data.activeSnoozeTaskIds.contains(task.id),
-                                  onTap: () => _openDetails(task),
-                                  onToggleComplete: () => _toggleComplete(task),
-                                  onTogglePin: () => _togglePin(task),
-                                  onEdit: () => _openEdit(task),
-                                  onDelete: () => _confirmDelete(task),
-                                );
-                              },
-                            ),
-                          ),
+                        onRefresh: () async => _reload(),
+                        child: ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
+                          itemCount: data.tasks.length,
+                          itemBuilder: (context, index) {
+                            final task = data.tasks[index];
+                            final category = task.categoryId == null
+                                ? null
+                                : data.categoryById[task.categoryId];
+                            return TaskListTile(
+                              task: task,
+                              category: category,
+                              tags: data.tagsByTaskId[task.id] ?? const [],
+                              hasActiveSnooze:
+                                  data.activeSnoozeTaskIds.contains(task.id),
+                              onTap: () => _openDetails(task),
+                              onToggleComplete: () => _toggleComplete(task),
+                              onTogglePin: () => _togglePin(task),
+                              onEdit: () => _openEdit(task),
+                              onDelete: () => _confirmDelete(task),
+                            );
+                          },
+                        ),
+                      ),
               ),
             ],
           );
@@ -378,7 +396,8 @@ class _TaskListData {
 /// Upcoming/Overdue) - a thin wrapper around [ChoiceChip] so the row reads
 /// as a single connected control rather than plain buttons.
 class _QuickDateChip extends StatelessWidget {
-  const _QuickDateChip({required this.label, required this.selected, required this.onTap});
+  const _QuickDateChip(
+      {required this.label, required this.selected, required this.onTap});
 
   final String label;
   final bool selected;
@@ -391,10 +410,15 @@ class _QuickDateChip extends StatelessWidget {
       selected: selected,
       onSelected: (_) => onTap(),
       showCheckmark: false,
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+      backgroundColor: Theme.of(context)
+          .colorScheme
+          .surfaceContainerHighest
+          .withValues(alpha: 0.5),
       selectedColor: Theme.of(context).colorScheme.primary,
       labelStyle: TextStyle(
-        color: selected ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).colorScheme.onSurface,
+        color: selected
+            ? Theme.of(context).colorScheme.onPrimary
+            : Theme.of(context).colorScheme.onSurface,
         fontWeight: FontWeight.w600,
       ),
     );

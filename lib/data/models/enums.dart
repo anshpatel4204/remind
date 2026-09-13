@@ -45,7 +45,8 @@ enum RecurrenceFrequency {
 
   int get dbValue => index;
 
-  static RecurrenceFrequency fromDbValue(int value) => RecurrenceFrequency.values[value];
+  static RecurrenceFrequency fromDbValue(int value) =>
+      RecurrenceFrequency.values[value];
 }
 
 /// The unit that a [RecurrenceFrequency.custom] rule's `intervalValue`
@@ -60,5 +61,6 @@ enum RecurrenceCustomUnit {
 
   int get dbValue => index;
 
-  static RecurrenceCustomUnit fromDbValue(int value) => RecurrenceCustomUnit.values[value];
+  static RecurrenceCustomUnit fromDbValue(int value) =>
+      RecurrenceCustomUnit.values[value];
 }

@@ -19,7 +19,8 @@ class TagModel {
       id: map[TagsTable.id] as int?,
       name: map[TagsTable.tagName] as String,
       color: map[TagsTable.color] as String?,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(map[TagsTable.createdAt] as int),
+      createdAt:
+          DateTime.fromMillisecondsSinceEpoch(map[TagsTable.createdAt] as int),
     );
   }
 
@@ -35,7 +36,8 @@ class TagModel {
     return map;
   }
 
-  TagModel copyWith({int? id, String? name, String? color, DateTime? createdAt}) {
+  TagModel copyWith(
+      {int? id, String? name, String? color, DateTime? createdAt}) {
     return TagModel(
       id: id ?? this.id,
       name: name ?? this.name,

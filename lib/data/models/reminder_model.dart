@@ -37,15 +37,19 @@ class ReminderModel {
     return ReminderModel(
       id: map[RemindersTable.id] as int?,
       taskId: map[RemindersTable.taskId] as int,
-      reminderTime: DateTime.fromMillisecondsSinceEpoch(map[RemindersTable.reminderTime] as int),
-      reminderType: ReminderType.fromDbValue(map[RemindersTable.reminderType] as int),
+      reminderTime: DateTime.fromMillisecondsSinceEpoch(
+          map[RemindersTable.reminderTime] as int),
+      reminderType:
+          ReminderType.fromDbValue(map[RemindersTable.reminderType] as int),
       isEnabled: (map[RemindersTable.isEnabled] as int) == 1,
       snoozeMinutes: map[RemindersTable.snoozeMinutes] as int?,
       snoozedUntil: map[RemindersTable.snoozedUntil] == null
           ? null
-          : DateTime.fromMillisecondsSinceEpoch(map[RemindersTable.snoozedUntil] as int),
+          : DateTime.fromMillisecondsSinceEpoch(
+              map[RemindersTable.snoozedUntil] as int),
       notificationId: map[RemindersTable.notificationId] as int?,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(map[RemindersTable.createdAt] as int),
+      createdAt: DateTime.fromMillisecondsSinceEpoch(
+          map[RemindersTable.createdAt] as int),
     );
   }
 
@@ -74,6 +78,7 @@ class ReminderModel {
     bool? isEnabled,
     int? snoozeMinutes,
     DateTime? snoozedUntil,
+
     /// Clears [snoozeMinutes] and [snoozedUntil] together - a reminder is
     /// never meaningfully "half snoozed", so these two always change as a
     /// pair rather than needing separate clear flags.
@@ -95,5 +100,6 @@ class ReminderModel {
   }
 
   @override
-  String toString() => 'ReminderModel(id: $id, taskId: $taskId, reminderTime: $reminderTime)';
+  String toString() =>
+      'ReminderModel(id: $id, taskId: $taskId, reminderTime: $reminderTime)';
 }

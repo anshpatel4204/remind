@@ -61,8 +61,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final soundEnabled = await scheduler.soundEnabled();
     final vibrationEnabled = await scheduler.vibrationEnabled();
     final defaultSnooze = await scheduler.defaultSnoozeOption();
-    final defaultPriority = await repos.settingsRepository.getDefaultTaskPriority();
-    final defaultCategoryId = await repos.settingsRepository.getDefaultCategoryId();
+    final defaultPriority =
+        await repos.settingsRepository.getDefaultTaskPriority();
+    final defaultCategoryId =
+        await repos.settingsRepository.getDefaultCategoryId();
     final categories = await repos.categoryRepository.getAllCategories();
     return _SettingsData(
       notificationsEnabled: notificationsEnabled,
@@ -89,7 +91,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _requestPermission() async {
-    await RepositoryScope.of(context).notificationScheduler.ensureNotificationPermission();
+    await RepositoryScope.of(context)
+        .notificationScheduler
+        .ensureNotificationPermission();
     if (!mounted) return;
     await _reload();
   }
@@ -150,13 +154,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Text('Select a backup to restore', style: Theme.of(context).textTheme.titleMedium),
+                child: Text('Select a backup to restore',
+                    style: Theme.of(context).textTheme.titleMedium),
               ),
               for (final backup in backups)
                 ListTile(
                   leading: const Icon(Icons.description_outlined),
                   title: Text(backup.name),
-                  subtitle: Text(DateFormat.yMMMd().add_jm().format(backup.modifiedAt)),
+                  subtitle: Text(
+                      DateFormat.yMMMd().add_jm().format(backup.modifiedAt)),
                   onTap: () => Navigator.of(context).pop(backup),
                 ),
             ],
@@ -188,7 +194,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: const Text('Cannot restore this backup'),
           content: Text(e.message),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')),
+            TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK')),
           ],
         ),
       );
@@ -214,8 +222,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'A safety backup of your current data will be made first.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Restore')),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Restore')),
         ],
       ),
     );
@@ -229,7 +241,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Restore failed. Your data has not been changed.')),
+        const SnackBar(
+            content: Text('Restore failed. Your data has not been changed.')),
       );
       return;
     }
@@ -242,7 +255,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: const Text('Restore complete'),
         content: const Text('Your data has been restored.'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK')),
         ],
       ),
     );
@@ -285,7 +300,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+                child:
+                    Text(title, style: Theme.of(context).textTheme.titleMedium),
               ),
               RadioGroup<T>(
                 groupValue: selected,
@@ -306,7 +322,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Column(
                   children: [
                     for (final option in options)
-                      RadioListTile<T>(title: Text(option.label), value: option.value),
+                      RadioListTile<T>(
+                          title: Text(option.label), value: option.value),
                   ],
                 ),
               ),
@@ -336,11 +353,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: REmindSectionHeader(title: 'Appearance', icon: Icons.palette_outlined),
+                child: REmindSectionHeader(
+                    title: 'Appearance', icon: Icons.palette_outlined),
               ),
               RadioGroup<ThemeMode>(
                 groupValue: themeController.mode,
-                onChanged: (mode) => mode == null ? null : themeController.setMode(mode),
+                onChanged: (mode) =>
+                    mode == null ? null : themeController.setMode(mode),
                 child: const Column(
                   children: [
                     RadioListTile<ThemeMode>(
@@ -361,17 +380,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const Divider(height: 32),
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: REmindSectionHeader(title: 'Notifications', icon: Icons.notifications_outlined),
+                child: REmindSectionHeader(
+                    title: 'Notifications', icon: Icons.notifications_outlined),
               ),
               ListTile(
                 leading: Icon(
                   data.notificationsEnabled
                       ? Icons.notifications_active_outlined
                       : Icons.notifications_off_outlined,
-                  color: data.notificationsEnabled ? AppColors.success : Theme.of(context).colorScheme.error,
+                  color: data.notificationsEnabled
+                      ? AppColors.success
+                      : Theme.of(context).colorScheme.error,
                 ),
                 title: const Text('Notifications'),
-                subtitle: Text(data.notificationsEnabled ? 'Allowed' : 'Not allowed'),
+                subtitle:
+                    Text(data.notificationsEnabled ? 'Allowed' : 'Not allowed'),
                 trailing: data.notificationsEnabled
                     ? null
                     : TextButton(
@@ -381,8 +404,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               ListTile(
                 leading: Icon(
-                  data.exactAlarmsAllowed ? Icons.alarm_on_outlined : Icons.alarm_off_outlined,
-                  color: data.exactAlarmsAllowed ? AppColors.success : Theme.of(context).colorScheme.error,
+                  data.exactAlarmsAllowed
+                      ? Icons.alarm_on_outlined
+                      : Icons.alarm_off_outlined,
+                  color: data.exactAlarmsAllowed
+                      ? AppColors.success
+                      : Theme.of(context).colorScheme.error,
                 ),
                 title: const Text('Exact reminder timing'),
                 subtitle: Text(
@@ -405,21 +432,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               SwitchListTile(
                 title: const Text('Enable notifications'),
-                subtitle: const Text('Turn off to stop all reminder notifications from REmind'),
+                subtitle: const Text(
+                    'Turn off to stop all reminder notifications from REmind'),
                 value: data.masterEnabled,
                 onChanged: (value) async {
-                  await repos.notificationScheduler.setNotificationsMasterEnabled(value);
+                  await repos.notificationScheduler
+                      .setNotificationsMasterEnabled(value);
                   await _reload();
                 },
               ),
               SwitchListTile(
                 title: const Text('Sound'),
-                subtitle: const Text('Play a sound with reminder notifications'),
+                subtitle:
+                    const Text('Play a sound with reminder notifications'),
                 value: data.soundEnabled,
                 onChanged: !data.masterEnabled
                     ? null
                     : (value) async {
-                        await repos.notificationScheduler.setSoundEnabled(value);
+                        await repos.notificationScheduler
+                            .setSoundEnabled(value);
                         await _reload();
                       },
               ),
@@ -430,23 +461,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: !data.masterEnabled
                     ? null
                     : (value) async {
-                        await repos.notificationScheduler.setVibrationEnabled(value);
+                        await repos.notificationScheduler
+                            .setVibrationEnabled(value);
                         await _reload();
                       },
               ),
               ListTile(
                 leading: const Icon(Icons.snooze_outlined),
                 title: const Text('Default snooze duration'),
-                subtitle: Text(_snoozeLabel[data.defaultSnooze] ?? '10 minutes'),
+                subtitle:
+                    Text(_snoozeLabel[data.defaultSnooze] ?? '10 minutes'),
                 onTap: () => _showPicker<SnoozeOption>(
                   title: 'Default snooze duration',
                   options: [
-                    for (final option in NotificationScheduler.defaultableSnoozeOptions)
+                    for (final option
+                        in NotificationScheduler.defaultableSnoozeOptions)
                       (value: option, label: _snoozeLabel[option]!),
                   ],
                   selected: data.defaultSnooze,
                   onSelected: (value) async {
-                    await repos.notificationScheduler.setDefaultSnoozeOption(value);
+                    await repos.notificationScheduler
+                        .setDefaultSnoozeOption(value);
                     await _reload();
                   },
                 ),
@@ -454,21 +489,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const Divider(height: 32),
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: REmindSectionHeader(title: 'Tasks', icon: Icons.checklist_outlined),
+                child: REmindSectionHeader(
+                    title: 'Tasks', icon: Icons.checklist_outlined),
               ),
               ListTile(
                 leading: const Icon(Icons.flag_outlined),
                 title: const Text('Default priority'),
-                subtitle: Text(AppColors.priorityLabel[data.defaultPriority] ?? 'Medium'),
+                subtitle: Text(
+                    AppColors.priorityLabel[data.defaultPriority] ?? 'Medium'),
                 onTap: () => _showPicker<TaskPriority>(
                   title: 'Default priority',
                   options: [
                     for (final priority in TaskPriority.values)
-                      (value: priority, label: AppColors.priorityLabel[priority]!),
+                      (
+                        value: priority,
+                        label: AppColors.priorityLabel[priority]!
+                      ),
                   ],
                   selected: data.defaultPriority,
                   onSelected: (value) async {
-                    await repos.settingsRepository.setDefaultTaskPriority(value);
+                    await repos.settingsRepository
+                        .setDefaultTaskPriority(value);
                     await _reload();
                   },
                 ),
@@ -476,7 +517,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ListTile(
                 leading: const Icon(Icons.folder_outlined),
                 title: const Text('Default category'),
-                subtitle: Text(_categoryLabel(data.categories, data.defaultCategoryId)),
+                subtitle: Text(
+                    _categoryLabel(data.categories, data.defaultCategoryId)),
                 onTap: () => _showPicker<int?>(
                   title: 'Default category',
                   options: [
@@ -494,24 +536,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const Divider(height: 32),
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: REmindSectionHeader(title: 'Backup', icon: Icons.backup_outlined),
+                child: REmindSectionHeader(
+                    title: 'Backup', icon: Icons.backup_outlined),
               ),
               ListTile(
                 leading: const Icon(Icons.backup_outlined),
                 title: const Text('Create backup'),
-                subtitle: const Text('Save all your tasks, reminders, and settings to a local file'),
+                subtitle: const Text(
+                    'Save all your tasks, reminders, and settings to a local file'),
                 onTap: _createBackup,
               ),
               ListTile(
                 leading: const Icon(Icons.restore_outlined),
                 title: const Text('Restore from backup'),
-                subtitle: const Text('Replace all current data with a previous backup'),
+                subtitle: const Text(
+                    'Replace all current data with a previous backup'),
                 onTap: _showRestoreList,
               ),
               const Divider(height: 32),
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: REmindSectionHeader(title: 'Data', icon: Icons.storage_outlined),
+                child: REmindSectionHeader(
+                    title: 'Data', icon: Icons.storage_outlined),
               ),
               const ListTile(
                 leading: Icon(Icons.info_outline),
@@ -531,7 +577,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const Divider(height: 32),
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: REmindSectionHeader(title: 'About', icon: Icons.info_outline),
+                child: REmindSectionHeader(
+                    title: 'About', icon: Icons.info_outline),
               ),
               ListTile(
                 leading: const Icon(Icons.info_outline),

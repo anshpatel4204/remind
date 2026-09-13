@@ -35,13 +35,16 @@ void main() {
         startDate: DateTime(2026, 1, 1, 8, 0),
       );
 
-      expect(RecurrenceCalculator.firstOccurrence(rule), DateTime(2026, 1, 1, 8, 0));
+      expect(RecurrenceCalculator.firstOccurrence(rule),
+          DateTime(2026, 1, 1, 8, 0));
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 1, 1, 8, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 1, 1, 8, 0)),
         DateTime(2026, 1, 2, 8, 0),
       );
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 1, 5, 8, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 1, 5, 8, 0)),
         DateTime(2026, 1, 6, 8, 0),
       );
     });
@@ -54,11 +57,13 @@ void main() {
       );
 
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 1, 1, 8, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 1, 1, 8, 0)),
         DateTime(2026, 1, 4, 8, 0),
       );
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 1, 4, 8, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 1, 4, 8, 0)),
         DateTime(2026, 1, 7, 8, 0),
       );
     });
@@ -73,9 +78,11 @@ void main() {
         startDate: DateTime(2026, 6, 15, 10, 0),
       );
 
-      expect(RecurrenceCalculator.firstOccurrence(rule), DateTime(2026, 6, 15, 10, 0));
+      expect(RecurrenceCalculator.firstOccurrence(rule),
+          DateTime(2026, 6, 15, 10, 0));
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 6, 15, 10, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 6, 15, 10, 0)),
         DateTime(2026, 6, 22, 10, 0),
       );
     });
@@ -88,22 +95,27 @@ void main() {
         startDate: DateTime(2026, 6, 15, 10, 0),
       );
 
-      expect(RecurrenceCalculator.firstOccurrence(rule), DateTime(2026, 6, 15, 10, 0));
+      expect(RecurrenceCalculator.firstOccurrence(rule),
+          DateTime(2026, 6, 15, 10, 0));
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 6, 15, 10, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 6, 15, 10, 0)),
         DateTime(2026, 6, 17, 10, 0), // Wednesday
       );
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 6, 17, 10, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 6, 17, 10, 0)),
         DateTime(2026, 6, 19, 10, 0), // Friday
       );
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 6, 19, 10, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 6, 19, 10, 0)),
         DateTime(2026, 6, 22, 10, 0), // following Monday
       );
     });
 
-    test('unsorted daysOfWeek input is still walked in chronological order', () {
+    test('unsorted daysOfWeek input is still walked in chronological order',
+        () {
       final rule = _rule(
         frequency: RecurrenceFrequency.weekly,
         daysOfWeek: [DateTime.friday, DateTime.monday, DateTime.wednesday],
@@ -111,12 +123,15 @@ void main() {
       );
 
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 6, 15, 10, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 6, 15, 10, 0)),
         DateTime(2026, 6, 17, 10, 0),
       );
     });
 
-    test('start date not on a selected weekday skips forward to the first match', () {
+    test(
+        'start date not on a selected weekday skips forward to the first match',
+        () {
       // 2026-06-17 is a Wednesday; only Monday and Friday are selected.
       final rule = _rule(
         frequency: RecurrenceFrequency.weekly,
@@ -126,7 +141,8 @@ void main() {
 
       // The Monday of that same week (Jun 15) is before startDate, so it
       // must not be treated as an occurrence - the first one is Friday.
-      expect(RecurrenceCalculator.firstOccurrence(rule), DateTime(2026, 6, 19, 9, 0));
+      expect(RecurrenceCalculator.firstOccurrence(rule),
+          DateTime(2026, 6, 19, 9, 0));
     });
 
     test('every N weeks (interval) with multiple weekdays', () {
@@ -138,11 +154,13 @@ void main() {
       );
 
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 6, 15, 10, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 6, 15, 10, 0)),
         DateTime(2026, 6, 29, 10, 0),
       );
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 6, 29, 10, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 6, 29, 10, 0)),
         DateTime(2026, 7, 13, 10, 0),
       );
     });
@@ -156,12 +174,14 @@ void main() {
       );
 
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 1, 15, 9, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 1, 15, 9, 0)),
         DateTime(2026, 2, 15, 9, 0),
       );
     });
 
-    test('a month that does not contain the selected day clamps, not overflows', () {
+    test('a month that does not contain the selected day clamps, not overflows',
+        () {
       // Jan 31 -> Feb 28 (2026 is not a leap year) -> Mar 31, never
       // spilling into March 3rd the way naive Duration-based addition
       // would.
@@ -170,17 +190,21 @@ void main() {
         startDate: DateTime(2026, 1, 31, 8, 0),
       );
 
-      expect(RecurrenceCalculator.firstOccurrence(rule), DateTime(2026, 1, 31, 8, 0));
+      expect(RecurrenceCalculator.firstOccurrence(rule),
+          DateTime(2026, 1, 31, 8, 0));
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 1, 31, 8, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 1, 31, 8, 0)),
         DateTime(2026, 2, 28, 8, 0),
       );
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 2, 28, 8, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 2, 28, 8, 0)),
         DateTime(2026, 3, 31, 8, 0),
       );
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 3, 31, 8, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 3, 31, 8, 0)),
         DateTime(2026, 4, 30, 8, 0),
       );
     });
@@ -193,11 +217,13 @@ void main() {
       );
 
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 1, 15, 9, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 1, 15, 9, 0)),
         DateTime(2026, 4, 15, 9, 0),
       );
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 4, 15, 9, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 4, 15, 9, 0)),
         DateTime(2026, 7, 15, 9, 0),
       );
     });
@@ -211,34 +237,42 @@ void main() {
       );
 
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 9, 15, 18, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 9, 15, 18, 0)),
         DateTime(2027, 9, 15, 18, 0),
       );
     });
 
-    test('leap-year Feb 29 clamps in non-leap years and recovers on the next leap year', () {
+    test(
+        'leap-year Feb 29 clamps in non-leap years and recovers on the next leap year',
+        () {
       final rule = _rule(
         frequency: RecurrenceFrequency.yearly,
         startDate: DateTime(2024, 2, 29, 7, 0), // 2024 is a leap year
       );
 
-      expect(RecurrenceCalculator.firstOccurrence(rule), DateTime(2024, 2, 29, 7, 0));
+      expect(RecurrenceCalculator.firstOccurrence(rule),
+          DateTime(2024, 2, 29, 7, 0));
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2024, 2, 29, 7, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2024, 2, 29, 7, 0)),
         DateTime(2025, 2, 28, 7, 0),
       );
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2025, 2, 28, 7, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2025, 2, 28, 7, 0)),
         DateTime(2026, 2, 28, 7, 0),
       );
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 2, 28, 7, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 2, 28, 7, 0)),
         DateTime(2027, 2, 28, 7, 0),
       );
       // 2028 is the next leap year: the 29th becomes reachable again
       // rather than staying permanently clamped to the 28th.
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2027, 12, 31)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2027, 12, 31)),
         DateTime(2028, 2, 29, 7, 0),
       );
     });
@@ -251,7 +285,8 @@ void main() {
       );
 
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 9, 15, 18, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 9, 15, 18, 0)),
         DateTime(2028, 9, 15, 18, 0),
       );
     });
@@ -267,12 +302,15 @@ void main() {
       );
 
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 1, 1, 8, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 1, 1, 8, 0)),
         DateTime(2026, 1, 6, 8, 0),
       );
     });
 
-    test('every N weeks collapses onto day-stepping (no weekday selection needed)', () {
+    test(
+        'every N weeks collapses onto day-stepping (no weekday selection needed)',
+        () {
       final rule = _rule(
         frequency: RecurrenceFrequency.custom,
         intervalValue: 2,
@@ -281,11 +319,13 @@ void main() {
       );
 
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 1, 1, 8, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 1, 1, 8, 0)),
         DateTime(2026, 1, 15, 8, 0),
       );
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 1, 15, 8, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 1, 15, 8, 0)),
         DateTime(2026, 1, 29, 8, 0),
       );
     });
@@ -299,7 +339,8 @@ void main() {
       );
 
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 1, 31, 8, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 1, 31, 8, 0)),
         DateTime(2026, 2, 28, 8, 0),
       );
     });
@@ -313,7 +354,8 @@ void main() {
       );
 
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2024, 2, 29, 8, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2024, 2, 29, 8, 0)),
         DateTime(2025, 2, 28, 8, 0),
       );
     });
@@ -328,7 +370,8 @@ void main() {
       );
 
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 1, 4, 8, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 1, 4, 8, 0)),
         DateTime(2026, 1, 5, 8, 0),
       );
     });
@@ -341,7 +384,8 @@ void main() {
       );
 
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 1, 5, 8, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 1, 5, 8, 0)),
         isNull,
       );
     });
@@ -356,24 +400,29 @@ void main() {
       );
 
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 1, 1, 8, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 1, 1, 8, 0)),
         DateTime(2026, 1, 2, 8, 0),
       );
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 1, 2, 8, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 1, 2, 8, 0)),
         DateTime(2026, 1, 3, 8, 0),
       );
       // The 3rd occurrence (Jan 3) was the last one allowed; nothing
       // follows it.
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 1, 3, 8, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 1, 3, 8, 0)),
         isNull,
       );
     });
   });
 
   group('past dates', () {
-    test('a lookup far in the past still returns the rule\'s own first occurrence', () {
+    test(
+        'a lookup far in the past still returns the rule\'s own first occurrence',
+        () {
       final rule = _rule(
         frequency: RecurrenceFrequency.daily,
         startDate: DateTime(2026, 1, 1, 8, 0),
@@ -395,7 +444,8 @@ void main() {
       );
 
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 1, 1, 8, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 1, 1, 8, 0)),
         isNull,
       );
     });
@@ -407,7 +457,8 @@ void main() {
       );
 
       expect(
-        RecurrenceCalculator.nextOccurrence(rule, after: DateTime(2026, 1, 1, 8, 0)),
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 1, 1, 8, 0)),
         isNull,
       );
     });

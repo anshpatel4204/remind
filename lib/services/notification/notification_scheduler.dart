@@ -120,7 +120,8 @@ class NotificationScheduler {
   /// hasn't been decided yet).
   Future<bool> notificationsEnabled() => _transport.areNotificationsEnabled();
 
-  Future<bool> canScheduleExactAlarms() => _transport.canScheduleExactNotifications();
+  Future<bool> canScheduleExactAlarms() =>
+      _transport.canScheduleExactNotifications();
 
   /// Whether REmind should post reminder notifications at all - an
   /// in-app master switch, independent of (and layered on top of) the
@@ -160,7 +161,8 @@ class NotificationScheduler {
   }
 
   Future<void> setVibrationEnabled(bool enabled) {
-    return _settingsRepository.setValue(_keyVibrationEnabled, enabled.toString());
+    return _settingsRepository.setValue(
+        _keyVibrationEnabled, enabled.toString());
   }
 
   /// The [SnoozeOption] applied when a notification's own Snooze action
@@ -207,7 +209,8 @@ class NotificationScheduler {
   /// exist for the same reminder - REmind's answer to "if a reminder is
   /// rescheduled, cancel the old scheduled notification before creating
   /// the new one".
-  Future<void> updateAndRescheduleReminder(int reminderId, DateTime newReminderTime) async {
+  Future<void> updateAndRescheduleReminder(
+      int reminderId, DateTime newReminderTime) async {
     await _transport.cancel(reminderId);
     await _reminderEngine.rescheduleReminder(reminderId, newReminderTime);
     final reminder = await _reminderRepository.getReminder(reminderId);
@@ -240,7 +243,8 @@ class NotificationScheduler {
     DateTime? now,
   }) async {
     final effectiveNow = now ?? DateTime.now();
-    final snoozeUntil = _resolveSnoozeTime(option, customDuration, effectiveNow);
+    final snoozeUntil =
+        _resolveSnoozeTime(option, customDuration, effectiveNow);
     final snoozeMinutes = snoozeUntil.difference(effectiveNow).inMinutes;
 
     final updated = await _reminderEngine.handleSnoozedReminder(
@@ -255,7 +259,8 @@ class NotificationScheduler {
     return updated;
   }
 
-  DateTime _resolveSnoozeTime(SnoozeOption option, Duration? customDuration, DateTime now) {
+  DateTime _resolveSnoozeTime(
+      SnoozeOption option, Duration? customDuration, DateTime now) {
     switch (option) {
       case SnoozeOption.tomorrow:
         // Component-wise, not a 24-hour Duration add, so a daylight-saving
@@ -271,7 +276,8 @@ class NotificationScheduler {
         );
       case SnoozeOption.custom:
         if (customDuration == null) {
-          throw ArgumentError('customDuration is required when option is SnoozeOption.custom');
+          throw ArgumentError(
+              'customDuration is required when option is SnoozeOption.custom');
         }
         return now.add(customDuration);
       default:
@@ -398,7 +404,8 @@ class NotificationScheduler {
         // ReminderEngine.catchUpMissedOccurrence. A non-recurring
         // reminder has no schedule to catch up to, so it is simply left
         // as a single overdue reminder, exactly as before.
-        final caughtUp = await _reminderEngine.catchUpMissedOccurrence(id, now: effectiveNow);
+        final caughtUp = await _reminderEngine.catchUpMissedOccurrence(id,
+            now: effectiveNow);
         if (caughtUp != null) {
           await _scheduleNotificationFor(caughtUp, exactOverride: exact);
         }
@@ -416,7 +423,8 @@ class NotificationScheduler {
     }
   }
 
-  Future<void> _scheduleNotificationFor(ReminderModel reminder, {bool? exactOverride}) async {
+  Future<void> _scheduleNotificationFor(ReminderModel reminder,
+      {bool? exactOverride}) async {
     final reminderId = reminder.id;
     if (reminderId == null) return;
 
@@ -427,7 +435,8 @@ class NotificationScheduler {
     if (!await notificationsMasterEnabled()) return;
 
     final task = await _taskRepository.getTask(reminder.taskId);
-    final exact = exactOverride ?? await _transport.canScheduleExactNotifications();
+    final exact =
+        exactOverride ?? await _transport.canScheduleExactNotifications();
     final sound = await soundEnabled();
     final vibration = await vibrationEnabled();
 
@@ -444,7 +453,8 @@ class NotificationScheduler {
     );
 
     if (reminder.notificationId != reminderId) {
-      await _reminderRepository.updateReminder(reminder.copyWith(notificationId: reminderId));
+      await _reminderRepository
+          .updateReminder(reminder.copyWith(notificationId: reminderId));
     }
   }
 }

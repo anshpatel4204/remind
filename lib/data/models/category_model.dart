@@ -26,7 +26,8 @@ class CategoryModel {
       color: map[CategoriesTable.color] as String?,
       iconName: map[CategoriesTable.iconName] as String?,
       isDefault: (map[CategoriesTable.isDefault] as int) == 1,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(map[CategoriesTable.createdAt] as int),
+      createdAt: DateTime.fromMillisecondsSinceEpoch(
+          map[CategoriesTable.createdAt] as int),
     );
   }
 

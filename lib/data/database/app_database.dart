@@ -15,7 +15,8 @@ class AppDatabase {
   /// [testDatabasePath], when provided, opens the database at this exact
   /// file path instead of the app's normal on-device databases directory.
   /// Used by tests to get an isolated, disposable database per test case.
-  AppDatabase({String? testDatabasePath}) : _testDatabasePath = testDatabasePath;
+  AppDatabase({String? testDatabasePath})
+      : _testDatabasePath = testDatabasePath;
 
   /// App-wide singleton used by production code.
   static final AppDatabase instance = AppDatabase();
@@ -28,7 +29,8 @@ class AppDatabase {
   }
 
   Future<Database> _open() async {
-    final path = _testDatabasePath ?? join(await getDatabasesPath(), DbConfig.databaseName);
+    final path = _testDatabasePath ??
+        join(await getDatabasesPath(), DbConfig.databaseName);
     return openDatabase(
       path,
       version: DbConfig.databaseVersion,
@@ -67,7 +69,8 @@ class AppDatabase {
   }
 
   Future<void> _upgradeV1ToV2(Database db) async {
-    await db.execute('ALTER TABLE ${LegacySchemaV1.tableName} RENAME TO tasks_old_v1');
+    await db.execute(
+        'ALTER TABLE ${LegacySchemaV1.tableName} RENAME TO tasks_old_v1');
 
     for (final statement in SchemaV2.createAllTables) {
       await db.execute(statement);
@@ -171,7 +174,8 @@ FROM tasks_old_v1
         await txn.insert(TasksTable.name, row);
       }
       for (final row in taskTags) {
-        await txn.insert(TaskTagsTable.name, row, conflictAlgorithm: ConflictAlgorithm.ignore);
+        await txn.insert(TaskTagsTable.name, row,
+            conflictAlgorithm: ConflictAlgorithm.ignore);
       }
       for (final row in reminders) {
         await txn.insert(RemindersTable.name, row);

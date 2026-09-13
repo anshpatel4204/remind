@@ -13,7 +13,8 @@ class SettingModel {
     return SettingModel(
       key: map[SettingsTable.key] as String,
       value: map[SettingsTable.value] as String?,
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(map[SettingsTable.updatedAt] as int),
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(
+          map[SettingsTable.updatedAt] as int),
     );
   }
 

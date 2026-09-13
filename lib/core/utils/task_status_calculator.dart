@@ -4,7 +4,14 @@ import '../../data/models/task_model.dart';
 /// The status actually shown to the user for a task, as opposed to the
 /// smaller set of statuses actually stored in the database (see
 /// [TaskStatus]).
-enum TaskDisplayStatus { pending, inProgress, completed, overdue, snoozed, cancelled }
+enum TaskDisplayStatus {
+  pending,
+  inProgress,
+  completed,
+  overdue,
+  snoozed,
+  cancelled
+}
 
 /// Derives the [TaskDisplayStatus] a task should show, from its stored
 /// [TaskModel] plus the current moment.

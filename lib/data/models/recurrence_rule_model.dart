@@ -46,20 +46,25 @@ class RecurrenceRuleModel {
     final rawDays = map[RecurrenceRulesTable.daysOfWeek] as String?;
     return RecurrenceRuleModel(
       id: map[RecurrenceRulesTable.id] as int?,
-      frequency: RecurrenceFrequency.fromDbValue(map[RecurrenceRulesTable.frequency] as int),
+      frequency: RecurrenceFrequency.fromDbValue(
+          map[RecurrenceRulesTable.frequency] as int),
       intervalValue: map[RecurrenceRulesTable.intervalValue] as int,
       daysOfWeek: (rawDays == null || rawDays.isEmpty)
           ? null
           : rawDays.split(',').map(int.parse).toList(),
       customUnit: map[RecurrenceRulesTable.customUnit] == null
           ? null
-          : RecurrenceCustomUnit.fromDbValue(map[RecurrenceRulesTable.customUnit] as int),
-      startDate: DateTime.fromMillisecondsSinceEpoch(map[RecurrenceRulesTable.startDate] as int),
+          : RecurrenceCustomUnit.fromDbValue(
+              map[RecurrenceRulesTable.customUnit] as int),
+      startDate: DateTime.fromMillisecondsSinceEpoch(
+          map[RecurrenceRulesTable.startDate] as int),
       endDate: map[RecurrenceRulesTable.endDate] == null
           ? null
-          : DateTime.fromMillisecondsSinceEpoch(map[RecurrenceRulesTable.endDate] as int),
+          : DateTime.fromMillisecondsSinceEpoch(
+              map[RecurrenceRulesTable.endDate] as int),
       occurrencesCount: map[RecurrenceRulesTable.occurrencesCount] as int?,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(map[RecurrenceRulesTable.createdAt] as int),
+      createdAt: DateTime.fromMillisecondsSinceEpoch(
+          map[RecurrenceRulesTable.createdAt] as int),
     );
   }
 
@@ -103,7 +108,9 @@ class RecurrenceRuleModel {
       customUnit: clearCustomUnit ? null : (customUnit ?? this.customUnit),
       startDate: startDate ?? this.startDate,
       endDate: clearEndDate ? null : (endDate ?? this.endDate),
-      occurrencesCount: clearOccurrencesCount ? null : (occurrencesCount ?? this.occurrencesCount),
+      occurrencesCount: clearOccurrencesCount
+          ? null
+          : (occurrencesCount ?? this.occurrencesCount),
       createdAt: createdAt ?? this.createdAt,
     );
   }

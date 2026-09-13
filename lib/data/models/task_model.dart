@@ -43,11 +43,14 @@ class TaskModel {
       dueDate: map[TasksTable.dueDate] == null
           ? null
           : DateTime.fromMillisecondsSinceEpoch(map[TasksTable.dueDate] as int),
-      createdAt: DateTime.fromMillisecondsSinceEpoch(map[TasksTable.createdAt] as int),
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(map[TasksTable.updatedAt] as int),
+      createdAt:
+          DateTime.fromMillisecondsSinceEpoch(map[TasksTable.createdAt] as int),
+      updatedAt:
+          DateTime.fromMillisecondsSinceEpoch(map[TasksTable.updatedAt] as int),
       completedAt: map[TasksTable.completedAt] == null
           ? null
-          : DateTime.fromMillisecondsSinceEpoch(map[TasksTable.completedAt] as int),
+          : DateTime.fromMillisecondsSinceEpoch(
+              map[TasksTable.completedAt] as int),
       isPinned: (map[TasksTable.isPinned] as int) == 1,
     );
   }
@@ -98,7 +101,9 @@ class TaskModel {
       priority: priority ?? this.priority,
       status: status ?? this.status,
       categoryId: clearCategoryId ? null : (categoryId ?? this.categoryId),
-      recurrenceRuleId: clearRecurrenceRuleId ? null : (recurrenceRuleId ?? this.recurrenceRuleId),
+      recurrenceRuleId: clearRecurrenceRuleId
+          ? null
+          : (recurrenceRuleId ?? this.recurrenceRuleId),
       dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

@@ -66,17 +66,23 @@ void main() {
     testDb = TestAppDatabase.create();
     backupRepository = BackupRepository(testDb.appDatabase);
     final taskTagDataSource = TaskTagDataSource(testDb.appDatabase);
-    taskRepository = TaskRepository(TaskDataSource(testDb.appDatabase), taskTagDataSource);
-    categoryRepository = CategoryRepository(CategoryDataSource(testDb.appDatabase));
-    tagRepository = TagRepository(TagDataSource(testDb.appDatabase), taskTagDataSource);
-    recurrenceRepository = RecurrenceRepository(RecurrenceRuleDataSource(testDb.appDatabase));
-    reminderRepository = ReminderRepository(ReminderDataSource(testDb.appDatabase));
+    taskRepository =
+        TaskRepository(TaskDataSource(testDb.appDatabase), taskTagDataSource);
+    categoryRepository =
+        CategoryRepository(CategoryDataSource(testDb.appDatabase));
+    tagRepository =
+        TagRepository(TagDataSource(testDb.appDatabase), taskTagDataSource);
+    recurrenceRepository =
+        RecurrenceRepository(RecurrenceRuleDataSource(testDb.appDatabase));
+    reminderRepository =
+        ReminderRepository(ReminderDataSource(testDb.appDatabase));
   });
 
   tearDown(() => testDb.tearDown());
 
   group('export', () {
-    test('produces the current schema/database version and every section', () async {
+    test('produces the current schema/database version and every section',
+        () async {
       final json = await backupRepository.exportToJson();
       final decoded = jsonDecode(json) as Map<String, Object?>;
 
@@ -112,7 +118,11 @@ void main() {
     });
 
     test('rejects a backup missing its data section', () {
-      final broken = {'schemaVersion': 1, 'appDatabaseVersion': 3, 'exportedAt': 0};
+      final broken = {
+        'schemaVersion': 1,
+        'appDatabaseVersion': 3,
+        'exportedAt': 0
+      };
       expect(
         () => backupRepository.parseAndValidate(jsonEncode(broken)),
         throwsA(isA<BackupValidationException>()),
@@ -124,13 +134,15 @@ void main() {
       expect(
         () => backupRepository.parseAndValidate(jsonEncode(tooNew)),
         throwsA(
-          isA<BackupValidationException>().having((e) => e.message, 'message', contains('newer version')),
+          isA<BackupValidationException>()
+              .having((e) => e.message, 'message', contains('newer version')),
         ),
       );
     });
 
     test('accepts an empty backup (every section present but empty)', () {
-      final data = backupRepository.parseAndValidate(jsonEncode(_emptyBackupJson()));
+      final data =
+          backupRepository.parseAndValidate(jsonEncode(_emptyBackupJson()));
       expect(data.totalRows, 0);
     });
 
@@ -152,7 +164,8 @@ void main() {
         ],
       );
       expect(
-        () => backupRepository.parseAndValidate(jsonEncode(duplicateCategories)),
+        () =>
+            backupRepository.parseAndValidate(jsonEncode(duplicateCategories)),
         throwsA(isA<BackupValidationException>()),
       );
     });
@@ -160,7 +173,11 @@ void main() {
     test('rejects a row that is missing its id', () {
       final noId = _emptyBackupJson(
         categories: [
-          {CategoriesTable.categoryName: 'Work', CategoriesTable.isDefault: 0, CategoriesTable.createdAt: 0},
+          {
+            CategoriesTable.categoryName: 'Work',
+            CategoriesTable.isDefault: 0,
+            CategoriesTable.createdAt: 0
+          },
         ],
       );
       expect(
@@ -169,7 +186,9 @@ void main() {
       );
     });
 
-    test('rejects a row with a corrupted/out-of-range field (e.g. an invalid enum value)', () {
+    test(
+        'rejects a row with a corrupted/out-of-range field (e.g. an invalid enum value)',
+        () {
       final badStatus = _emptyBackupJson(
         tasks: [
           {
@@ -190,7 +209,8 @@ void main() {
       );
     });
 
-    test('rejects a task that refers to a category not present in the backup', () {
+    test('rejects a task that refers to a category not present in the backup',
+        () {
       final orphanCategory = _emptyBackupJson(
         tasks: [
           {
@@ -211,7 +231,8 @@ void main() {
       );
     });
 
-    test('rejects a reminder that refers to a task not present in the backup', () {
+    test('rejects a reminder that refers to a task not present in the backup',
+        () {
       final orphanReminder = _emptyBackupJson(
         reminders: [
           {
@@ -230,7 +251,8 @@ void main() {
       );
     });
 
-    test('rejects a task/tag relationship referring to a missing task or tag', () {
+    test('rejects a task/tag relationship referring to a missing task or tag',
+        () {
       final orphanLink = _emptyBackupJson(
         taskTags: [
           {TaskTagsTable.taskId: 1, TaskTagsTable.tagId: 1},
@@ -244,17 +266,21 @@ void main() {
   });
 
   group('restore', () {
-    test('an empty backup wipes the database, including the default categories', () async {
-      final data = backupRepository.parseAndValidate(jsonEncode(_emptyBackupJson()));
+    test('an empty backup wipes the database, including the default categories',
+        () async {
+      final data =
+          backupRepository.parseAndValidate(jsonEncode(_emptyBackupJson()));
       await backupRepository.restore(data);
 
       expect(await categoryRepository.getAllCategories(), isEmpty);
       expect(await taskRepository.getAllTasks(), isEmpty);
     });
 
-    test('restoring replaces existing data rather than merging with it', () async {
+    test('restoring replaces existing data rather than merging with it',
+        () async {
       await taskRepository.createTask(title: 'Will be wiped');
-      final data = backupRepository.parseAndValidate(jsonEncode(_emptyBackupJson()));
+      final data =
+          backupRepository.parseAndValidate(jsonEncode(_emptyBackupJson()));
 
       await backupRepository.restore(data);
 
@@ -262,8 +288,11 @@ void main() {
       expect(remaining, isEmpty);
     });
 
-    test('a full export/import round trip preserves every table and relationship', () async {
-      final category = await categoryRepository.createCategory(name: 'Fitness', color: '#112233');
+    test(
+        'a full export/import round trip preserves every table and relationship',
+        () async {
+      final category = await categoryRepository.createCategory(
+          name: 'Fitness', color: '#112233');
       final tag = await tagRepository.createTag(name: 'urgent-tag');
       final rule = await recurrenceRepository.createRule(
         frequency: RecurrenceFrequency.weekly,
@@ -276,7 +305,8 @@ void main() {
         recurrenceRuleId: rule.id,
         tagIds: [tag.id!],
       );
-      await reminderRepository.createReminder(taskId: task.id!, reminderTime: DateTime(2026, 1, 2, 9));
+      await reminderRepository.createReminder(
+          taskId: task.id!, reminderTime: DateTime(2026, 1, 2, 9));
 
       final exported = await backupRepository.exportToJson();
 
@@ -286,7 +316,8 @@ void main() {
       final targetDb = TestAppDatabase.create();
       addTearDown(() => targetDb.tearDown());
       final targetBackupRepository = BackupRepository(targetDb.appDatabase);
-      final targetCategoryRepository = CategoryRepository(CategoryDataSource(targetDb.appDatabase));
+      final targetCategoryRepository =
+          CategoryRepository(CategoryDataSource(targetDb.appDatabase));
       final targetTagRepository = TagRepository(
         TagDataSource(targetDb.appDatabase),
         TaskTagDataSource(targetDb.appDatabase),
@@ -295,13 +326,16 @@ void main() {
         TaskDataSource(targetDb.appDatabase),
         TaskTagDataSource(targetDb.appDatabase),
       );
-      final targetReminderRepository = ReminderRepository(ReminderDataSource(targetDb.appDatabase));
-      final targetRecurrenceRepository = RecurrenceRepository(RecurrenceRuleDataSource(targetDb.appDatabase));
+      final targetReminderRepository =
+          ReminderRepository(ReminderDataSource(targetDb.appDatabase));
+      final targetRecurrenceRepository =
+          RecurrenceRepository(RecurrenceRuleDataSource(targetDb.appDatabase));
 
       final parsed = targetBackupRepository.parseAndValidate(exported);
       await targetBackupRepository.restore(parsed);
 
-      final restoredCategory = await targetCategoryRepository.getCategory(category.id!);
+      final restoredCategory =
+          await targetCategoryRepository.getCategory(category.id!);
       expect(restoredCategory?.name, 'Fitness');
 
       final restoredTask = await targetTaskRepository.getTask(task.id!);
@@ -316,7 +350,8 @@ void main() {
       final restoredRule = await targetRecurrenceRepository.getRule(rule.id!);
       expect(restoredRule?.daysOfWeek, [1, 3, 5]);
 
-      final restoredReminders = await targetReminderRepository.getRemindersForTask(task.id!);
+      final restoredReminders =
+          await targetReminderRepository.getRemindersForTask(task.id!);
       expect(restoredReminders, hasLength(1));
     });
   });

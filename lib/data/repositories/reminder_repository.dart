@@ -27,9 +27,11 @@ class ReminderRepository {
 
   Future<ReminderModel?> getReminder(int id) => _dataSource.getById(id);
 
-  Future<List<ReminderModel>> getRemindersForTask(int taskId) => _dataSource.getForTask(taskId);
+  Future<List<ReminderModel>> getRemindersForTask(int taskId) =>
+      _dataSource.getForTask(taskId);
 
-  Future<List<ReminderModel>> getAllEnabledReminders() => _dataSource.getAllEnabled();
+  Future<List<ReminderModel>> getAllEnabledReminders() =>
+      _dataSource.getAllEnabled();
 
   Future<void> updateReminder(ReminderModel reminder) async {
     if (reminder.id == null) {
@@ -43,7 +45,8 @@ class ReminderRepository {
     if (reminder == null) return;
     final snoozedUntil = DateTime.now().add(Duration(minutes: snoozeMinutes));
     await _dataSource.update(
-      reminder.copyWith(snoozeMinutes: snoozeMinutes, snoozedUntil: snoozedUntil),
+      reminder.copyWith(
+          snoozeMinutes: snoozeMinutes, snoozedUntil: snoozedUntil),
     );
   }
 

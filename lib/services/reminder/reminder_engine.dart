@@ -61,7 +61,8 @@ class ReminderEngine {
   Future<void> cancelReminder(int reminderId) async {
     final reminder = await _reminderRepository.getReminder(reminderId);
     if (reminder == null) return;
-    await _reminderRepository.updateReminder(reminder.copyWith(isEnabled: false));
+    await _reminderRepository
+        .updateReminder(reminder.copyWith(isEnabled: false));
   }
 
   /// Moves [reminderId] to fire at [newReminderTime] instead, re-enabling
@@ -69,11 +70,13 @@ class ReminderEngine {
   /// snooze computed relative to the old time no longer means anything
   /// once the reminder's own time has moved. Does nothing if the reminder
   /// no longer exists.
-  Future<void> rescheduleReminder(int reminderId, DateTime newReminderTime) async {
+  Future<void> rescheduleReminder(
+      int reminderId, DateTime newReminderTime) async {
     final reminder = await _reminderRepository.getReminder(reminderId);
     if (reminder == null) return;
     await _reminderRepository.updateReminder(
-      reminder.copyWith(reminderTime: newReminderTime, isEnabled: true, clearSnooze: true),
+      reminder.copyWith(
+          reminderTime: newReminderTime, isEnabled: true, clearSnooze: true),
     );
   }
 
@@ -90,7 +93,8 @@ class ReminderEngine {
   }) async {
     final rule = await _recurrenceRepository.getRule(recurrenceRuleId);
     if (rule == null) return null;
-    return RecurrenceCalculator.nextOccurrence(rule, after: after, inclusive: inclusive);
+    return RecurrenceCalculator.nextOccurrence(rule,
+        after: after, inclusive: inclusive);
   }
 
   /// Call this when a recurring task (one with a `recurrenceRuleId` and a
@@ -113,7 +117,8 @@ class ReminderEngine {
   /// for good, and this returns null. Returns null too if [taskId] does
   /// not exist, is not actually recurring, or has no due date to advance
   /// from.
-  Future<TaskModel?> handleCompletedRecurringTask(int taskId, {DateTime? now}) async {
+  Future<TaskModel?> handleCompletedRecurringTask(int taskId,
+      {DateTime? now}) async {
     final task = await _taskRepository.getTask(taskId);
     if (task == null) return null;
 
@@ -176,7 +181,8 @@ class ReminderEngine {
   /// For a reminder whose task is not recurring (or has no due date),
   /// there is no schedule to catch up to - it is simply an overdue
   /// one-off reminder - so this does nothing and returns null.
-  Future<ReminderModel?> catchUpMissedOccurrence(int reminderId, {DateTime? now}) async {
+  Future<ReminderModel?> catchUpMissedOccurrence(int reminderId,
+      {DateTime? now}) async {
     final reminder = await _reminderRepository.getReminder(reminderId);
     if (reminder == null) return null;
 
@@ -195,7 +201,8 @@ class ReminderEngine {
     if (next == null) {
       // The recurrence ended somewhere during the missed time - nothing
       // left to catch up to; stop scheduling it for good.
-      await _reminderRepository.updateReminder(reminder.copyWith(isEnabled: false));
+      await _reminderRepository
+          .updateReminder(reminder.copyWith(isEnabled: false));
       return null;
     }
 

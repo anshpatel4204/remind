@@ -33,14 +33,16 @@ void main() {
   });
 
   test('create, read, update, and delete a custom category', () async {
-    final created = await repository.createCategory(name: 'Fitness', color: '#00FF00');
+    final created =
+        await repository.createCategory(name: 'Fitness', color: '#00FF00');
     expect(created.id, isNotNull);
     expect(created.isDefault, isFalse);
 
     final fetched = await repository.getCategory(created.id!);
     expect(fetched?.name, 'Fitness');
 
-    await repository.updateCategory(fetched!.copyWith(name: 'Fitness & Health'));
+    await repository
+        .updateCategory(fetched!.copyWith(name: 'Fitness & Health'));
     final updated = await repository.getCategory(created.id!);
     expect(updated?.name, 'Fitness & Health');
 
@@ -59,9 +61,11 @@ void main() {
   });
 
   group('deleting a category used by tasks', () {
-    test('leaves the tasks intact with categoryId cleared to null, not deleted', () async {
+    test('leaves the tasks intact with categoryId cleared to null, not deleted',
+        () async {
       final created = await repository.createCategory(name: 'Side project');
-      final task = await taskRepository.createTask(title: 'Ship it', categoryId: created.id);
+      final task = await taskRepository.createTask(
+          title: 'Ship it', categoryId: created.id);
 
       await repository.deleteCategory(created.id!);
 

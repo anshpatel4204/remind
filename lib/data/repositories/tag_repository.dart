@@ -31,5 +31,6 @@ class TagRepository {
   /// ON DELETE CASCADE foreign key - the tasks themselves are unaffected.
   Future<void> deleteTag(int id) => _dataSource.delete(id);
 
-  Future<List<int>> getTaskIdsForTag(int tagId) => _taskTagDataSource.getTaskIdsForTag(tagId);
+  Future<List<int>> getTaskIdsForTag(int tagId) =>
+      _taskTagDataSource.getTaskIdsForTag(tagId);
 }

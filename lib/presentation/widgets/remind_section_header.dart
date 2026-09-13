@@ -6,7 +6,8 @@ import '../../core/theme/app_spacing.dart';
 /// "Today's tasks", "By priority") - an optional leading icon, the title,
 /// and an optional trailing widget (e.g. a "See all" action).
 class REmindSectionHeader extends StatelessWidget {
-  const REmindSectionHeader({super.key, required this.title, this.icon, this.trailing});
+  const REmindSectionHeader(
+      {super.key, required this.title, this.icon, this.trailing});
 
   final String title;
   final IconData? icon;
@@ -17,10 +18,13 @@ class REmindSectionHeader extends StatelessWidget {
     return Row(
       children: [
         if (icon != null) ...[
-          Icon(icon, size: AppSpacing.iconSmall + 2, color: Theme.of(context).colorScheme.onSurfaceVariant),
+          Icon(icon,
+              size: AppSpacing.iconSmall + 2,
+              color: Theme.of(context).colorScheme.onSurfaceVariant),
           const SizedBox(width: AppSpacing.xs + 2),
         ],
-        Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium)),
+        Expanded(
+            child: Text(title, style: Theme.of(context).textTheme.titleMedium)),
         if (trailing != null) trailing!,
       ],
     );

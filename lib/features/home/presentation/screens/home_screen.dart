@@ -61,13 +61,19 @@ class _HomeScreenState extends State<HomeScreen> {
     final repos = RepositoryScope.of(context);
     final now = DateTime.now();
 
-    final overdue = await repos.taskRepository.getFilteredTasks(_overdueFilter, now: now);
-    final dueToday = await repos.taskRepository.getFilteredTasks(_dueTodayFilter, now: now);
-    final upcoming = await repos.taskRepository.getFilteredTasks(_upcomingFilter, now: now);
-    final completed = await repos.taskRepository.getFilteredTasks(_completedFilter, now: now);
+    final overdue =
+        await repos.taskRepository.getFilteredTasks(_overdueFilter, now: now);
+    final dueToday =
+        await repos.taskRepository.getFilteredTasks(_dueTodayFilter, now: now);
+    final upcoming =
+        await repos.taskRepository.getFilteredTasks(_upcomingFilter, now: now);
+    final completed =
+        await repos.taskRepository.getFilteredTasks(_completedFilter, now: now);
     final pinnedAll = await repos.taskRepository.getAllTasks(pinnedOnly: true);
     final pinned = pinnedAll
-        .where((t) => t.status != TaskStatus.completed && t.status != TaskStatus.cancelled)
+        .where((t) =>
+            t.status != TaskStatus.completed &&
+            t.status != TaskStatus.cancelled)
         .toList();
 
     // Today's tasks and pinned tasks are the only ones actually rendered as
@@ -75,7 +81,10 @@ class _HomeScreenState extends State<HomeScreen> {
     // task in every stat bucket.
     final tileTasks = <TaskModel>{...dueToday, ...pinned}.toList();
     final categories = await repos.categoryRepository.getAllCategories();
-    final categoryById = {for (final c in categories) if (c.id != null) c.id!: c};
+    final categoryById = {
+      for (final c in categories)
+        if (c.id != null) c.id!: c
+    };
 
     final tagsByTaskId = <int, List<TagModel>>{};
     final activeSnoozeTaskIds = <int>{};
@@ -84,7 +93,10 @@ class _HomeScreenState extends State<HomeScreen> {
       tagsByTaskId[id] = await repos.taskRepository.getTagsForTask(id);
       final reminders = await repos.reminderRepository.getRemindersForTask(id);
       final hasActiveSnooze = reminders.any(
-        (r) => r.isEnabled && r.snoozedUntil != null && r.snoozedUntil!.isAfter(now),
+        (r) =>
+            r.isEnabled &&
+            r.snoozedUntil != null &&
+            r.snoozedUntil!.isAfter(now),
       );
       if (hasActiveSnooze) activeSnoozeTaskIds.add(id);
     }
@@ -139,7 +151,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _togglePin(TaskModel task) async {
-    await RepositoryScope.of(context).taskRepository.setPinned(task.id!, !task.isPinned);
+    await RepositoryScope.of(context)
+        .taskRepository
+        .setPinned(task.id!, !task.isPinned);
     _reload();
   }
 
@@ -148,7 +162,8 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete task?'),
-        content: Text('"${task.title}" will be permanently deleted, along with its reminder.'),
+        content: Text(
+            '"${task.title}" will be permanently deleted, along with its reminder.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -205,7 +220,8 @@ class _HomeScreenState extends State<HomeScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
               children: [
-                Text(_greeting(now), style: Theme.of(context).textTheme.headlineSmall),
+                Text(_greeting(now),
+                    style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 4),
                 Text(
                   _fullDateFormat.format(now),
@@ -254,14 +270,18 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 if (data.pinnedTasks.isNotEmpty) ...[
                   const SizedBox(height: 24),
-                  const REmindSectionHeader(title: 'Pinned', icon: Icons.push_pin),
+                  const REmindSectionHeader(
+                      title: 'Pinned', icon: Icons.push_pin),
                   const SizedBox(height: 8),
                   for (final task in data.pinnedTasks)
                     TaskListTile(
                       task: task,
-                      category: task.categoryId == null ? null : data.categoryById[task.categoryId],
+                      category: task.categoryId == null
+                          ? null
+                          : data.categoryById[task.categoryId],
                       tags: data.tagsByTaskId[task.id] ?? const [],
-                      hasActiveSnooze: data.activeSnoozeTaskIds.contains(task.id),
+                      hasActiveSnooze:
+                          data.activeSnoozeTaskIds.contains(task.id),
                       onTap: () => _openDetails(task),
                       onToggleComplete: () => _toggleComplete(task),
                       onTogglePin: () => _togglePin(task),
@@ -270,7 +290,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                 ],
                 const SizedBox(height: 24),
-                const REmindSectionHeader(title: "Today's tasks", icon: Icons.checklist_outlined),
+                const REmindSectionHeader(
+                    title: "Today's tasks", icon: Icons.checklist_outlined),
                 const SizedBox(height: 8),
                 if (data.dueTodayTasks.isEmpty)
                   const REmindEmptyState(
@@ -282,9 +303,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   for (final task in data.dueTodayTasks)
                     TaskListTile(
                       task: task,
-                      category: task.categoryId == null ? null : data.categoryById[task.categoryId],
+                      category: task.categoryId == null
+                          ? null
+                          : data.categoryById[task.categoryId],
                       tags: data.tagsByTaskId[task.id] ?? const [],
-                      hasActiveSnooze: data.activeSnoozeTaskIds.contains(task.id),
+                      hasActiveSnooze:
+                          data.activeSnoozeTaskIds.contains(task.id),
                       onTap: () => _openDetails(task),
                       onToggleComplete: () => _toggleComplete(task),
                       onTogglePin: () => _togglePin(task),
@@ -327,4 +351,3 @@ class _HomeData {
   final Map<int, List<TagModel>> tagsByTaskId;
   final Set<int> activeSnoozeTaskIds;
 }
-

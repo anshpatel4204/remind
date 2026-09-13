@@ -14,7 +14,8 @@ void main() {
 
   setUp(() {
     testDb = TestAppDatabase.create();
-    repository = RecurrenceRepository(RecurrenceRuleDataSource(testDb.appDatabase));
+    repository =
+        RecurrenceRepository(RecurrenceRuleDataSource(testDb.appDatabase));
   });
 
   tearDown(() => testDb.tearDown());
@@ -54,7 +55,8 @@ void main() {
 
     // Round-trip through an update too, so a rewritten customUnit is
     // actually persisted and not silently dropped.
-    await repository.updateRule(fetched!.copyWith(customUnit: RecurrenceCustomUnit.months));
+    await repository
+        .updateRule(fetched!.copyWith(customUnit: RecurrenceCustomUnit.months));
     final updated = await repository.getRule(created.id!);
     expect(updated?.customUnit, RecurrenceCustomUnit.months);
   });

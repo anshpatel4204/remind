@@ -27,8 +27,10 @@ void main() {
       TaskDataSource(testDb.appDatabase),
       TaskTagDataSource(testDb.appDatabase),
     );
-    reminderRepository = ReminderRepository(ReminderDataSource(testDb.appDatabase));
-    recurrenceRepository = RecurrenceRepository(RecurrenceRuleDataSource(testDb.appDatabase));
+    reminderRepository =
+        ReminderRepository(ReminderDataSource(testDb.appDatabase));
+    recurrenceRepository =
+        RecurrenceRepository(RecurrenceRuleDataSource(testDb.appDatabase));
     engine = ReminderEngine(
       taskRepository: taskRepository,
       reminderRepository: reminderRepository,
@@ -53,7 +55,8 @@ void main() {
       expect(reminder.isEnabled, isTrue);
     });
 
-    test('cancelReminder disables an existing reminder without deleting it', () async {
+    test('cancelReminder disables an existing reminder without deleting it',
+        () async {
       final task = await taskRepository.createTask(title: 'Pay rent');
       final reminder = await engine.scheduleReminder(
         taskId: task.id!,
@@ -67,12 +70,14 @@ void main() {
       expect(fetched?.isEnabled, isFalse);
     });
 
-    test('cancelReminder does nothing for a reminder that no longer exists', () async {
+    test('cancelReminder does nothing for a reminder that no longer exists',
+        () async {
       await engine.cancelReminder(999999);
       // No exception, no side effect to check - just proves it doesn't throw.
     });
 
-    test('rescheduleReminder moves the time, re-enables, and clears any snooze', () async {
+    test('rescheduleReminder moves the time, re-enables, and clears any snooze',
+        () async {
       final task = await taskRepository.createTask(title: 'Pay rent');
       final reminder = await engine.scheduleReminder(
         taskId: task.id!,
@@ -85,7 +90,8 @@ void main() {
         now: DateTime(2026, 9, 15, 9, 0),
       );
 
-      await engine.rescheduleReminder(reminder.id!, DateTime(2026, 9, 16, 9, 0));
+      await engine.rescheduleReminder(
+          reminder.id!, DateTime(2026, 9, 16, 9, 0));
 
       final fetched = await reminderRepository.getReminder(reminder.id!);
       expect(fetched?.reminderTime, DateTime(2026, 9, 16, 9, 0));
@@ -120,7 +126,9 @@ void main() {
   });
 
   group('handleCompletedRecurringTask', () {
-    test('rolls a recurring task forward to its next occurrence, and shifts its reminders', () async {
+    test(
+        'rolls a recurring task forward to its next occurrence, and shifts its reminders',
+        () async {
       final rule = await recurrenceRepository.createRule(
         frequency: RecurrenceFrequency.daily,
         startDate: DateTime(2026, 1, 1, 9, 0),
@@ -153,7 +161,8 @@ void main() {
 
       // The reminder must have shifted forward by the same one-day gap,
       // keeping its original 30-minutes-before-due-date offset.
-      final persistedReminder = await reminderRepository.getReminder(reminder.id!);
+      final persistedReminder =
+          await reminderRepository.getReminder(reminder.id!);
       expect(persistedReminder?.reminderTime, DateTime(2026, 1, 2, 8, 30));
     });
 
@@ -178,15 +187,18 @@ void main() {
       );
       await taskRepository.completeTask(task.id!);
 
-      await engine.handleCompletedRecurringTask(task.id!, now: DateTime(2026, 1, 1, 9, 5));
+      await engine.handleCompletedRecurringTask(task.id!,
+          now: DateTime(2026, 1, 1, 9, 5));
 
-      final persistedReminder = await reminderRepository.getReminder(reminder.id!);
+      final persistedReminder =
+          await reminderRepository.getReminder(reminder.id!);
       expect(persistedReminder?.snoozeMinutes, isNull);
       expect(persistedReminder?.snoozedUntil, isNull);
       expect(persistedReminder?.isEnabled, isTrue);
     });
 
-    test('leaves the task completed for good once the recurrence has ended', () async {
+    test('leaves the task completed for good once the recurrence has ended',
+        () async {
       final rule = await recurrenceRepository.createRule(
         frequency: RecurrenceFrequency.daily,
         startDate: DateTime(2026, 1, 1, 9, 0),
@@ -228,8 +240,10 @@ void main() {
   });
 
   group('catchUpMissedOccurrence', () {
-    test('jumps a recurring reminder straight to the next future occurrence '
-        'after several missed days, without stepping through each one', () async {
+    test(
+        'jumps a recurring reminder straight to the next future occurrence '
+        'after several missed days, without stepping through each one',
+        () async {
       final rule = await recurrenceRepository.createRule(
         frequency: RecurrenceFrequency.daily,
         startDate: DateTime(2026, 1, 1, 8, 0),
@@ -259,14 +273,16 @@ void main() {
       final persistedTask = await taskRepository.getTask(task.id!);
       expect(persistedTask?.dueDate, DateTime(2026, 1, 7, 8, 0));
 
-      final persistedReminder = await reminderRepository.getReminder(reminder.id!);
+      final persistedReminder =
+          await reminderRepository.getReminder(reminder.id!);
       expect(persistedReminder?.reminderTime, DateTime(2026, 1, 7, 8, 0));
       expect(persistedReminder?.isEnabled, isTrue);
 
       // Same rows advanced in place - no duplicate task or reminder was
       // created for any of the missed occurrences.
       expect(await taskRepository.getTask(task.id!), isNotNull);
-      expect((await reminderRepository.getRemindersForTask(task.id!)).length, 1);
+      expect(
+          (await reminderRepository.getRemindersForTask(task.id!)).length, 1);
     });
 
     test('clears an expired snooze as part of catching up', () async {
@@ -299,7 +315,8 @@ void main() {
       expect(caughtUp.snoozedUntil, isNull);
     });
 
-    test('the recurrence rule itself is never lost while catching up', () async {
+    test('the recurrence rule itself is never lost while catching up',
+        () async {
       final rule = await recurrenceRepository.createRule(
         frequency: RecurrenceFrequency.daily,
         startDate: DateTime(2026, 1, 1, 8, 0),
@@ -314,14 +331,17 @@ void main() {
         reminderTime: DateTime(2026, 1, 1, 8, 0),
       );
 
-      await engine.catchUpMissedOccurrence(reminder.id!, now: DateTime(2026, 1, 6, 12, 0));
+      await engine.catchUpMissedOccurrence(reminder.id!,
+          now: DateTime(2026, 1, 6, 12, 0));
 
       final persistedTask = await taskRepository.getTask(task.id!);
       expect(persistedTask?.recurrenceRuleId, rule.id);
       expect(await recurrenceRepository.getRule(rule.id!), isNotNull);
     });
 
-    test('disables the reminder once the recurrence ended during the missed time', () async {
+    test(
+        'disables the reminder once the recurrence ended during the missed time',
+        () async {
       final rule = await recurrenceRepository.createRule(
         frequency: RecurrenceFrequency.daily,
         startDate: DateTime(2026, 1, 1, 8, 0),
@@ -344,7 +364,8 @@ void main() {
       );
 
       expect(caughtUp, isNull);
-      final persistedReminder = await reminderRepository.getReminder(reminder.id!);
+      final persistedReminder =
+          await reminderRepository.getReminder(reminder.id!);
       expect(persistedReminder?.isEnabled, isFalse);
     });
 
@@ -364,19 +385,22 @@ void main() {
       );
 
       expect(caughtUp, isNull);
-      final persistedReminder = await reminderRepository.getReminder(reminder.id!);
+      final persistedReminder =
+          await reminderRepository.getReminder(reminder.id!);
       expect(persistedReminder?.reminderTime, DateTime(2026, 1, 1, 8, 0));
       expect(persistedReminder?.isEnabled, isTrue);
     });
 
     test('returns null for a reminder that does not exist', () async {
-      final caughtUp = await engine.catchUpMissedOccurrence(999999, now: DateTime(2026, 1, 6));
+      final caughtUp = await engine.catchUpMissedOccurrence(999999,
+          now: DateTime(2026, 1, 6));
       expect(caughtUp, isNull);
     });
   });
 
   group('handleSnoozedReminder', () {
-    test('sets snoozedUntil relative to the given now, and persists it', () async {
+    test('sets snoozedUntil relative to the given now, and persists it',
+        () async {
       final task = await taskRepository.createTask(title: 'Stretch');
       final reminder = await engine.scheduleReminder(
         taskId: task.id!,
@@ -399,7 +423,8 @@ void main() {
     });
 
     test('returns null for a reminder that does not exist', () async {
-      final snoozed = await engine.handleSnoozedReminder(999999, snoozeMinutes: 5);
+      final snoozed =
+          await engine.handleSnoozedReminder(999999, snoozeMinutes: 5);
       expect(snoozed, isNull);
     });
   });

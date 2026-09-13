@@ -41,7 +41,8 @@ class REmindEmptyState extends StatelessWidget {
           Image.asset(imageAsset!, width: 96, height: 96)
         else if (icon != null)
           Icon(icon, size: 48, color: Theme.of(context).colorScheme.outline),
-        if (imageAsset != null || icon != null) const SizedBox(height: AppSpacing.lg),
+        if (imageAsset != null || icon != null)
+          const SizedBox(height: AppSpacing.lg),
         Text(
           title,
           style: Theme.of(context).textTheme.titleMedium,

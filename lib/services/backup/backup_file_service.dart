@@ -36,7 +36,8 @@ class BackupFileService {
   /// Writes [jsonContent] to a new timestamped file and returns it.
   Future<File> writeBackup(String jsonContent) async {
     final dir = await _backupsDirectory();
-    final timestamp = DateTime.now().toIso8601String().replaceAll(RegExp(r'[:.]'), '-');
+    final timestamp =
+        DateTime.now().toIso8601String().replaceAll(RegExp(r'[:.]'), '-');
     final file = File(p.join(dir.path, 'remind_backup_$timestamp.json'));
     await file.writeAsString(jsonContent);
     return file;
@@ -46,8 +47,10 @@ class BackupFileService {
   /// the file listing from a backup the user made on purpose.
   Future<File> writeSafetyBackup(String jsonContent) async {
     final dir = await _backupsDirectory();
-    final timestamp = DateTime.now().toIso8601String().replaceAll(RegExp(r'[:.]'), '-');
-    final file = File(p.join(dir.path, 'remind_before_restore_$timestamp.json'));
+    final timestamp =
+        DateTime.now().toIso8601String().replaceAll(RegExp(r'[:.]'), '-');
+    final file =
+        File(p.join(dir.path, 'remind_before_restore_$timestamp.json'));
     await file.writeAsString(jsonContent);
     return file;
   }

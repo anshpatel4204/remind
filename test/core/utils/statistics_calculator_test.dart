@@ -61,7 +61,11 @@ void main() {
 
     test('an in-progress task past its due date also counts as overdue', () {
       final stats = StatisticsCalculator.compute(
-        [taskWith(status: TaskStatus.inProgress, dueDate: now.subtract(const Duration(days: 1)))],
+        [
+          taskWith(
+              status: TaskStatus.inProgress,
+              dueDate: now.subtract(const Duration(days: 1)))
+        ],
         now: now,
       );
       expect(stats.overdue, 1);
@@ -85,7 +89,11 @@ void main() {
   group('StatisticsCalculator.compute - overdue vs missed', () {
     test('a cancelled task whose due date already passed counts as missed', () {
       final stats = StatisticsCalculator.compute(
-        [taskWith(status: TaskStatus.cancelled, dueDate: now.subtract(const Duration(days: 1)))],
+        [
+          taskWith(
+              status: TaskStatus.cancelled,
+              dueDate: now.subtract(const Duration(days: 1)))
+        ],
         now: now,
       );
       expect(stats.cancelled, 1);
@@ -104,7 +112,11 @@ void main() {
 
     test('a cancelled task due in the future is not counted as missed', () {
       final stats = StatisticsCalculator.compute(
-        [taskWith(status: TaskStatus.cancelled, dueDate: now.add(const Duration(days: 1)))],
+        [
+          taskWith(
+              status: TaskStatus.cancelled,
+              dueDate: now.add(const Duration(days: 1)))
+        ],
         now: now,
       );
       expect(stats.cancelled, 1);
@@ -112,8 +124,11 @@ void main() {
     });
   });
 
-  group('StatisticsCalculator.compute - completed today/this week/this month', () {
-    test('a task completed today counts in all three windows and in "today"\'s chart bar', () {
+  group('StatisticsCalculator.compute - completed today/this week/this month',
+      () {
+    test(
+        'a task completed today counts in all three windows and in "today"\'s chart bar',
+        () {
       final stats = StatisticsCalculator.compute(
         [taskWith(status: TaskStatus.completed, completedAt: now)],
         now: now,
@@ -124,7 +139,9 @@ void main() {
       expect(stats.completedPerDay.last, 1);
     });
 
-    test('a task completed yesterday (last week, same month) only counts this month', () {
+    test(
+        'a task completed yesterday (last week, same month) only counts this month',
+        () {
       // `now` is a Monday, so yesterday falls in the previous calendar week.
       final yesterday = now.subtract(const Duration(days: 1));
       final stats = StatisticsCalculator.compute(
@@ -136,7 +153,9 @@ void main() {
       expect(stats.completedThisMonth, 1);
     });
 
-    test('a task completed before this month started counts in none of the three', () {
+    test(
+        'a task completed before this month started counts in none of the three',
+        () {
       final lastMonth = DateTime(now.year, now.month - 1, 20);
       final stats = StatisticsCalculator.compute(
         [taskWith(status: TaskStatus.completed, completedAt: lastMonth)],
@@ -158,7 +177,9 @@ void main() {
       expect(stats.completedPerDay.reduce((a, b) => a + b), 1);
     });
 
-    test('a task completed more than 6 days ago does not appear in the chart at all', () {
+    test(
+        'a task completed more than 6 days ago does not appear in the chart at all',
+        () {
       final longAgo = now.subtract(const Duration(days: 30));
       final stats = StatisticsCalculator.compute(
         [taskWith(status: TaskStatus.completed, completedAt: longAgo)],
@@ -171,7 +192,8 @@ void main() {
   });
 
   group('StatisticsCalculator.compute - breakdowns', () {
-    test('byPriority tallies every task, including priorities with zero tasks', () {
+    test('byPriority tallies every task, including priorities with zero tasks',
+        () {
       final stats = StatisticsCalculator.compute(
         [
           taskWith(priority: TaskPriority.high),

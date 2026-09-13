@@ -50,10 +50,12 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     final task = await repos.taskRepository.getTask(widget.taskId);
     if (task == null) return null;
 
-    final category =
-        task.categoryId == null ? null : await repos.categoryRepository.getCategory(task.categoryId!);
+    final category = task.categoryId == null
+        ? null
+        : await repos.categoryRepository.getCategory(task.categoryId!);
     final tags = await repos.taskRepository.getTagsForTask(task.id!);
-    final reminders = await repos.reminderRepository.getRemindersForTask(task.id!);
+    final reminders =
+        await repos.reminderRepository.getRemindersForTask(task.id!);
 
     return _TaskDetailsData(
       task: task,
@@ -75,7 +77,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     // the task's reminder notification(s) are cancelled - and, for a
     // recurring task, rescheduled for the next occurrence - rather than
     // firing again for a task that's already done.
-    await RepositoryScope.of(context).notificationScheduler.completeTask(task.id!);
+    await RepositoryScope.of(context)
+        .notificationScheduler
+        .completeTask(task.id!);
     if (!mounted) return;
     setState(() => _busy = false);
     _reload();
@@ -102,7 +106,8 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete task?'),
-        content: Text('"${task.title}" will be permanently deleted, along with its reminder.'),
+        content: Text(
+            '"${task.title}" will be permanently deleted, along with its reminder.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -216,7 +221,10 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
               if (_busy)
                 Positioned.fill(
                   child: ColoredBox(
-                    color: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.32),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .scrim
+                        .withValues(alpha: 0.32),
                     child: const Center(child: CircularProgressIndicator()),
                   ),
                 ),
@@ -241,7 +249,8 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     );
     final categoryColor = data.category == null
         ? null
-        : (colorFromHex(data.category!.color) ?? kDefaultCategoryColors[data.category!.name]);
+        : (colorFromHex(data.category!.color) ??
+            kDefaultCategoryColors[data.category!.name]);
     final isCompleted = task.status == TaskStatus.completed;
     final reminder = data.reminder;
     final canSnoozeOrReschedule = reminder != null && !isCompleted;
@@ -260,9 +269,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
             if (data.category != null)
               Chip(
                 label: Text(data.category!.name),
-                backgroundColor:
-                    (categoryColor ?? Theme.of(context).colorScheme.secondaryContainer)
-                        .withValues(alpha: 0.15),
+                backgroundColor: (categoryColor ??
+                        Theme.of(context).colorScheme.secondaryContainer)
+                    .withValues(alpha: 0.15),
               ),
           ],
         ),
@@ -275,7 +284,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         ],
         Text('Due', style: Theme.of(context).textTheme.labelLarge),
         const SizedBox(height: 4),
-        Text(task.dueDate == null ? 'No due date set' : formatDateTime(task.dueDate!)),
+        Text(task.dueDate == null
+            ? 'No due date set'
+            : formatDateTime(task.dueDate!)),
         const SizedBox(height: 20),
         Text('Tags', style: Theme.of(context).textTheme.labelLarge),
         const SizedBox(height: 4),
@@ -289,7 +300,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                     Chip(
                       label: Text(tag.name),
                       backgroundColor: (colorFromHex(tag.color) ??
-                              Theme.of(context).colorScheme.surfaceContainerHighest)
+                              Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest)
                           .withValues(alpha: 0.4),
                     ),
                 ],
@@ -336,7 +349,8 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
               onPressed: _busy ? null : () => _delete(task),
               icon: const Icon(Icons.delete_outline),
               label: const Text('Delete'),
-              style: OutlinedButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
+              style: OutlinedButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error),
             ),
           ],
         ),
@@ -346,7 +360,8 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
 
   String _reminderInfoText(ReminderModel? reminder) {
     if (reminder == null) return 'No reminder set';
-    if (reminder.snoozedUntil != null && reminder.snoozedUntil!.isAfter(DateTime.now())) {
+    if (reminder.snoozedUntil != null &&
+        reminder.snoozedUntil!.isAfter(DateTime.now())) {
       return 'Snoozed until ${formatDateTime(reminder.snoozedUntil!)}';
     }
     final base = 'Reminder set for ${formatDateTime(reminder.reminderTime)}';
@@ -398,11 +413,13 @@ class _SnoozeOptionsSheet extends StatelessWidget {
     );
     if (picked == null) return;
     final now = DateTime.now();
-    var target = DateTime(now.year, now.month, now.day, picked.hour, picked.minute);
+    var target =
+        DateTime(now.year, now.month, now.day, picked.hour, picked.minute);
     if (!target.isAfter(now)) target = target.add(const Duration(days: 1));
     if (context.mounted) {
       Navigator.of(context).pop(
-        _SnoozeChoice(SnoozeOption.custom, customDuration: target.difference(now)),
+        _SnoozeChoice(SnoozeOption.custom,
+            customDuration: target.difference(now)),
       );
     }
   }
@@ -419,18 +436,22 @@ class _SnoozeOptionsSheet extends StatelessWidget {
             Container(
               width: 48,
               height: 48,
-              decoration: BoxDecoration(color: primary.withValues(alpha: 0.15), shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                  color: primary.withValues(alpha: 0.15),
+                  shape: BoxShape.circle),
               alignment: Alignment.center,
               child: Icon(Icons.notifications_outlined, color: primary),
             ),
             const SizedBox(height: 12),
-            Text('Snooze Reminder', style: Theme.of(context).textTheme.titleMedium),
+            Text('Snooze Reminder',
+                style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             for (final preset in _presets)
               ListTile(
                 leading: Icon(Icons.schedule_outlined, color: primary),
                 title: Text(preset.$2),
-                onTap: () => Navigator.of(context).pop(_SnoozeChoice(preset.$1)),
+                onTap: () =>
+                    Navigator.of(context).pop(_SnoozeChoice(preset.$1)),
               ),
             ListTile(
               leading: Icon(Icons.edit_calendar_outlined, color: primary),

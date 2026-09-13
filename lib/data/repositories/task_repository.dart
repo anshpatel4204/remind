@@ -84,7 +84,8 @@ class TaskRepository {
   /// second pass over the SQL results instead. [now] exists only so tests
   /// can pin "the current moment"; real callers should leave it as the
   /// current device time.
-  Future<List<TaskModel>> getFilteredTasks(TaskFilter filter, {DateTime? now}) async {
+  Future<List<TaskModel>> getFilteredTasks(TaskFilter filter,
+      {DateTime? now}) async {
     final effectiveNow = now ?? DateTime.now();
     final window = _resolveDueDateWindow(
       filter.dueDateFilter,
@@ -114,13 +115,17 @@ class TaskRepository {
     // caller that uses it directly, e.g. the filter sheet's Date chips.)
     if (filter.dueDateFilter == DueDateFilter.overdue) {
       tasks = tasks
-          .where((t) => t.status != TaskStatus.completed && t.status != TaskStatus.cancelled)
+          .where((t) =>
+              t.status != TaskStatus.completed &&
+              t.status != TaskStatus.cancelled)
           .toList();
     }
 
     if (filter.status == null) return tasks;
     return tasks
-        .where((t) => TaskStatusCalculator.displayStatusFor(t, now: effectiveNow) == filter.status)
+        .where((t) =>
+            TaskStatusCalculator.displayStatusFor(t, now: effectiveNow) ==
+            filter.status)
         .toList();
   }
 
@@ -154,24 +159,28 @@ class TaskRepository {
             .subtract(const Duration(milliseconds: 1));
         return (from: startOfDay, to: endOfDay, noDueDateOnly: false);
       case DueDateFilter.tomorrow:
-        final startOfTomorrow = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+        final startOfTomorrow =
+            DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
         final endOfTomorrow = startOfTomorrow
             .add(const Duration(days: 1))
             .subtract(const Duration(milliseconds: 1));
         return (from: startOfTomorrow, to: endOfTomorrow, noDueDateOnly: false);
       case DueDateFilter.thisWeek:
         final startOfDay = DateTime(now.year, now.month, now.day);
-        final startOfWeek = startOfDay.subtract(Duration(days: startOfDay.weekday - 1));
+        final startOfWeek =
+            startOfDay.subtract(Duration(days: startOfDay.weekday - 1));
         final endOfWeek = startOfWeek
             .add(const Duration(days: 7))
             .subtract(const Duration(milliseconds: 1));
         return (from: startOfWeek, to: endOfWeek, noDueDateOnly: false);
       case DueDateFilter.thisMonth:
         final startOfMonth = DateTime(now.year, now.month);
-        final endOfMonth = DateTime(now.year, now.month + 1).subtract(const Duration(milliseconds: 1));
+        final endOfMonth = DateTime(now.year, now.month + 1)
+            .subtract(const Duration(milliseconds: 1));
         return (from: startOfMonth, to: endOfMonth, noDueDateOnly: false);
       case DueDateFilter.upcoming:
-        final startOfTomorrow = DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
+        final startOfTomorrow =
+            DateTime(now.year, now.month, now.day).add(const Duration(days: 1));
         return (from: startOfTomorrow, to: null, noDueDateOnly: false);
       case DueDateFilter.overdue:
         return (from: null, to: now, noDueDateOnly: false);
@@ -193,7 +202,8 @@ class TaskRepository {
     if (task.id == null) {
       throw ArgumentError('Cannot update a task with no id');
     }
-    final normalized = _withConsistentCompletion(task.copyWith(updatedAt: DateTime.now()));
+    final normalized =
+        _withConsistentCompletion(task.copyWith(updatedAt: DateTime.now()));
     await _taskDataSource.update(normalized);
   }
 
@@ -202,7 +212,8 @@ class TaskRepository {
     if (task == null) return;
     final now = DateTime.now();
     await _taskDataSource.update(
-      task.copyWith(status: TaskStatus.completed, updatedAt: now, completedAt: now),
+      task.copyWith(
+          status: TaskStatus.completed, updatedAt: now, completedAt: now),
     );
   }
 
@@ -236,15 +247,20 @@ class TaskRepository {
   /// since they are independent, reusable entities.
   Future<void> deleteTask(int id) => _taskDataSource.deleteCascading(id);
 
-  Future<List<TagModel>> getTagsForTask(int taskId) => _taskTagDataSource.getTagsForTask(taskId);
+  Future<List<TagModel>> getTagsForTask(int taskId) =>
+      _taskTagDataSource.getTagsForTask(taskId);
 
   Future<void> setTagsForTask(int taskId, List<int> tagIds) =>
       _taskTagDataSource.replaceTagsForTask(taskId, tagIds);
 
   TaskModel _withConsistentCompletion(TaskModel task) {
     if (task.status == TaskStatus.completed) {
-      return task.completedAt == null ? task.copyWith(completedAt: DateTime.now()) : task;
+      return task.completedAt == null
+          ? task.copyWith(completedAt: DateTime.now())
+          : task;
     }
-    return task.completedAt == null ? task : task.copyWith(clearCompletedAt: true);
+    return task.completedAt == null
+        ? task
+        : task.copyWith(clearCompletedAt: true);
   }
 }

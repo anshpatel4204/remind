@@ -79,7 +79,8 @@ class BackupRepository {
     }
 
     if (decoded is! Map<String, Object?>) {
-      throw const BackupValidationException('This does not look like a REmind backup file.');
+      throw const BackupValidationException(
+          'This does not look like a REmind backup file.');
     }
 
     final schemaVersion = decoded[BackupJsonKeys.schemaVersion];
@@ -111,19 +112,24 @@ class BackupRepository {
 
     final data = decoded[BackupJsonKeys.data];
     if (data is! Map<String, Object?>) {
-      throw const BackupValidationException('This backup has no data section and cannot be read.');
+      throw const BackupValidationException(
+          'This backup has no data section and cannot be read.');
     }
 
-    final categories = _parseRows(data, BackupJsonKeys.categories, CategoryModel.fromMap, CategoriesTable.id);
-    final tags = _parseRows(data, BackupJsonKeys.tags, TagModel.fromMap, TagsTable.id);
+    final categories = _parseRows(data, BackupJsonKeys.categories,
+        CategoryModel.fromMap, CategoriesTable.id);
+    final tags =
+        _parseRows(data, BackupJsonKeys.tags, TagModel.fromMap, TagsTable.id);
     final recurrenceRules = _parseRows(
       data,
       BackupJsonKeys.recurrenceRules,
       RecurrenceRuleModel.fromMap,
       RecurrenceRulesTable.id,
     );
-    final tasks = _parseRows(data, BackupJsonKeys.tasks, TaskModel.fromMap, TasksTable.id);
-    final reminders = _parseRows(data, BackupJsonKeys.reminders, ReminderModel.fromMap, RemindersTable.id);
+    final tasks = _parseRows(
+        data, BackupJsonKeys.tasks, TaskModel.fromMap, TasksTable.id);
+    final reminders = _parseRows(data, BackupJsonKeys.reminders,
+        ReminderModel.fromMap, RemindersTable.id);
     final settings = _parseSettings(data);
     final taskTags = _parseTaskTags(data);
 
@@ -138,7 +144,8 @@ class BackupRepository {
           'Backup is inconsistent: task ${task.id} refers to a category that is not in the backup.',
         );
       }
-      if (task.recurrenceRuleId != null && !recurrenceRuleIds.contains(task.recurrenceRuleId)) {
+      if (task.recurrenceRuleId != null &&
+          !recurrenceRuleIds.contains(task.recurrenceRuleId)) {
         throw BackupValidationException(
           'Backup is inconsistent: task ${task.id} refers to a recurrence rule that is not in the backup.',
         );
@@ -197,20 +204,24 @@ class BackupRepository {
     for (var i = 0; i < raw.length; i++) {
       final row = raw[i];
       if (row is! Map) {
-        throw BackupValidationException('Backup entry $key[$i] is not a valid record.');
+        throw BackupValidationException(
+            'Backup entry $key[$i] is not a valid record.');
       }
       final map = Map<String, Object?>.from(row);
       final id = map[idKey];
       if (id is! int) {
-        throw BackupValidationException('Backup entry $key[$i] is missing its id.');
+        throw BackupValidationException(
+            'Backup entry $key[$i] is missing its id.');
       }
       if (!seenIds.add(id)) {
-        throw BackupValidationException('Backup has duplicate ids in "$key": $id.');
+        throw BackupValidationException(
+            'Backup has duplicate ids in "$key": $id.');
       }
       try {
         result.add(fromMap(map));
       } catch (_) {
-        throw BackupValidationException('Backup entry $key[$i] has an invalid or corrupted field.');
+        throw BackupValidationException(
+            'Backup entry $key[$i] has an invalid or corrupted field.');
       }
     }
     return result;
@@ -219,27 +230,32 @@ class BackupRepository {
   List<SettingModel> _parseSettings(Map<String, Object?> data) {
     final raw = data[BackupJsonKeys.settings];
     if (raw is! List) {
-      throw const BackupValidationException('Backup is missing its "settings" section.');
+      throw const BackupValidationException(
+          'Backup is missing its "settings" section.');
     }
     final seenKeys = <Object?>{};
     final result = <SettingModel>[];
     for (var i = 0; i < raw.length; i++) {
       final row = raw[i];
       if (row is! Map) {
-        throw BackupValidationException('Backup entry settings[$i] is not a valid record.');
+        throw BackupValidationException(
+            'Backup entry settings[$i] is not a valid record.');
       }
       final map = Map<String, Object?>.from(row);
       final key = map[SettingsTable.key];
       if (key is! String) {
-        throw BackupValidationException('Backup entry settings[$i] is missing its key.');
+        throw BackupValidationException(
+            'Backup entry settings[$i] is missing its key.');
       }
       if (!seenKeys.add(key)) {
-        throw BackupValidationException('Backup has a duplicate setting key: $key.');
+        throw BackupValidationException(
+            'Backup has a duplicate setting key: $key.');
       }
       try {
         result.add(SettingModel.fromMap(map));
       } catch (_) {
-        throw BackupValidationException('Backup entry settings[$i] has an invalid or corrupted field.');
+        throw BackupValidationException(
+            'Backup entry settings[$i] has an invalid or corrupted field.');
       }
     }
     return result;
@@ -248,24 +264,28 @@ class BackupRepository {
   List<TaskTagLink> _parseTaskTags(Map<String, Object?> data) {
     final raw = data[BackupJsonKeys.taskTags];
     if (raw is! List) {
-      throw const BackupValidationException('Backup is missing its "taskTags" section.');
+      throw const BackupValidationException(
+          'Backup is missing its "taskTags" section.');
     }
     final seenLinks = <String>{};
     final result = <TaskTagLink>[];
     for (var i = 0; i < raw.length; i++) {
       final row = raw[i];
       if (row is! Map) {
-        throw BackupValidationException('Backup entry taskTags[$i] is not a valid record.');
+        throw BackupValidationException(
+            'Backup entry taskTags[$i] is not a valid record.');
       }
       final map = Map<String, Object?>.from(row);
       final taskId = map[TaskTagsTable.taskId];
       final tagId = map[TaskTagsTable.tagId];
       if (taskId is! int || tagId is! int) {
-        throw BackupValidationException('Backup entry taskTags[$i] has an invalid or corrupted field.');
+        throw BackupValidationException(
+            'Backup entry taskTags[$i] has an invalid or corrupted field.');
       }
       final linkKey = '$taskId:$tagId';
       if (!seenLinks.add(linkKey)) {
-        throw BackupValidationException('Backup has a duplicate task/tag relationship: $linkKey.');
+        throw BackupValidationException(
+            'Backup has a duplicate task/tag relationship: $linkKey.');
       }
       result.add(TaskTagLink(taskId: taskId, tagId: tagId));
     }
@@ -282,7 +302,9 @@ class BackupRepository {
     return _appDatabase.replaceAllData(
       categories: [for (final c in data.categories) c.toMap(includeId: true)],
       tags: [for (final t in data.tags) t.toMap(includeId: true)],
-      recurrenceRules: [for (final r in data.recurrenceRules) r.toMap(includeId: true)],
+      recurrenceRules: [
+        for (final r in data.recurrenceRules) r.toMap(includeId: true)
+      ],
       tasks: [for (final t in data.tasks) t.toMap(includeId: true)],
       taskTags: [
         for (final link in data.taskTags)

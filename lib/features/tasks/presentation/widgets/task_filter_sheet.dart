@@ -18,12 +18,14 @@ Future<TaskFilter?> showTaskFilterSheet(
   return showModalBottomSheet<TaskFilter>(
     context: context,
     isScrollControlled: true,
-    builder: (context) => _TaskFilterSheet(current: current, categories: categories, tags: tags),
+    builder: (context) =>
+        _TaskFilterSheet(current: current, categories: categories, tags: tags),
   );
 }
 
 class _TaskFilterSheet extends StatefulWidget {
-  const _TaskFilterSheet({required this.current, required this.categories, required this.tags});
+  const _TaskFilterSheet(
+      {required this.current, required this.categories, required this.tags});
 
   final TaskFilter current;
   final List<CategoryModel> categories;
@@ -98,7 +100,8 @@ class _TaskFilterSheetState extends State<_TaskFilterSheet> {
               Row(
                 children: [
                   Expanded(
-                    child: Text('Filter & sort', style: Theme.of(context).textTheme.titleLarge),
+                    child: Text('Filter & sort',
+                        style: Theme.of(context).textTheme.titleLarge),
                   ),
                   TextButton(onPressed: _clear, child: const Text('Clear all')),
                 ],
@@ -118,7 +121,8 @@ class _TaskFilterSheetState extends State<_TaskFilterSheet> {
                     ChoiceChip(
                       label: Text(category.name),
                       selected: _categoryId == category.id,
-                      onSelected: (_) => setState(() => _categoryId = category.id),
+                      onSelected: (_) =>
+                          setState(() => _categoryId = category.id),
                     ),
                 ],
               ),
@@ -198,7 +202,8 @@ class _TaskFilterSheetState extends State<_TaskFilterSheet> {
                     ChoiceChip(
                       label: Text(_dueDateFilterLabel(option)),
                       selected: _dueDateFilter == option,
-                      onSelected: (_) => setState(() => _dueDateFilter = option),
+                      onSelected: (_) =>
+                          setState(() => _dueDateFilter = option),
                     ),
                 ],
               ),
@@ -210,25 +215,30 @@ class _TaskFilterSheetState extends State<_TaskFilterSheet> {
                   Expanded(
                     child: DropdownButtonFormField<TaskSortOption>(
                       initialValue: _sortBy,
-                      decoration: const InputDecoration(border: OutlineInputBorder()),
+                      decoration:
+                          const InputDecoration(border: OutlineInputBorder()),
                       items: TaskSortOption.values
-                          .map((s) => DropdownMenuItem(value: s, child: Text(_sortLabel(s))))
+                          .map((s) => DropdownMenuItem(
+                              value: s, child: Text(_sortLabel(s))))
                           .toList(),
-                      onChanged: (value) => setState(() => _sortBy = value ?? _sortBy),
+                      onChanged: (value) =>
+                          setState(() => _sortBy = value ?? _sortBy),
                     ),
                   ),
                   const SizedBox(width: 8),
                   IconButton.filledTonal(
                     onPressed: () => setState(() => _ascending = !_ascending),
                     tooltip: _ascending ? 'Ascending' : 'Descending',
-                    icon: Icon(_ascending ? Icons.arrow_upward : Icons.arrow_downward),
+                    icon: Icon(
+                        _ascending ? Icons.arrow_upward : Icons.arrow_downward),
                   ),
                 ],
               ),
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
-                child: FilledButton(onPressed: _apply, child: const Text('Apply')),
+                child:
+                    FilledButton(onPressed: _apply, child: const Text('Apply')),
               ),
             ],
           ),

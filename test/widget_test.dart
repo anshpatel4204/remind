@@ -66,7 +66,8 @@ void main() {
   }) async {
     for (var i = 0; i < maxAttempts; i++) {
       if (finder.evaluate().isNotEmpty) break;
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)));
       await tester.pump();
     }
     // Let any in-flight route transition (push/pop slide+fade) finish so a
@@ -77,7 +78,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
   }
 
-  testWidgets('REmind shell shows all five navigation destinations', (WidgetTester tester) async {
+  testWidgets('REmind shell shows all five navigation destinations',
+      (WidgetTester tester) async {
     await tester.pumpWidget(RemindApp(repositories: repositories));
     await tester.pump();
 
@@ -88,7 +90,8 @@ void main() {
     expect(find.text('Settings'), findsOneWidget);
   });
 
-  testWidgets('Tapping Tasks shows the task list with its empty state', (WidgetTester tester) async {
+  testWidgets('Tapping Tasks shows the task list with its empty state',
+      (WidgetTester tester) async {
     await tester.pumpWidget(RemindApp(repositories: repositories));
     await tester.pump();
 
@@ -123,7 +126,8 @@ void main() {
     await tester.tap(find.byTooltip('Add task'));
     await pumpUntilFound(tester, find.widgetWithText(TextFormField, 'Title'));
 
-    await tester.enterText(find.widgetWithText(TextFormField, 'Title'), 'Buy groceries');
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Title'), 'Buy groceries');
     await tester.tap(find.widgetWithIcon(IconButton, Icons.check));
 
     // See the Calendar-tab equivalent test for why: the title field we
@@ -139,7 +143,8 @@ void main() {
     expect(find.text('No tasks yet'), findsNothing);
   });
 
-  testWidgets('Calendar shows a Day/Week/Month switcher and navigates between them', (
+  testWidgets(
+      'Calendar shows a Day/Week/Month switcher and navigates between them', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(RemindApp(repositories: repositories));
@@ -166,7 +171,8 @@ void main() {
     expect(find.text('Mon'), findsOneWidget);
   });
 
-  testWidgets('Creating a task from the Calendar tab shows it in that day\'s list', (
+  testWidgets(
+      'Creating a task from the Calendar tab shows it in that day\'s list', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(RemindApp(repositories: repositories));
@@ -178,7 +184,8 @@ void main() {
     await tester.tap(find.byTooltip('Add task').first);
     await pumpUntilFound(tester, find.widgetWithText(TextFormField, 'Title'));
 
-    await tester.enterText(find.widgetWithText(TextFormField, 'Title'), 'Water the plants');
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Title'), 'Water the plants');
     await tester.tap(find.widgetWithIcon(IconButton, Icons.check));
 
     // Waiting for the literal text "Water the plants" alone is ambiguous:
@@ -208,14 +215,16 @@ void main() {
     // rest of this file's real-database waits, lets both happen the way
     // they would outside a test.
     for (var settle = 0; settle < 12; settle++) {
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)));
       await tester.pump(const Duration(seconds: 1));
     }
 
     expect(find.text('Water the plants'), findsOneWidget);
   });
 
-  testWidgets('Search shows a prompt, then "no results" for a non-matching query', (
+  testWidgets(
+      'Search shows a prompt, then "no results" for a non-matching query', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(RemindApp(repositories: repositories));
@@ -234,7 +243,8 @@ void main() {
     // finder happened to order first rather than reliably the new
     // screen's field. Target it by key instead, since that field is the
     // only place a Key('searchScreenField') exists in the tree.
-    await tester.enterText(find.byKey(const Key('searchScreenField')), 'nothing matches this');
+    await tester.enterText(
+        find.byKey(const Key('searchScreenField')), 'nothing matches this');
 
     // The search box debounces via a real Timer(250ms) before it fires the
     // query, and that Timer runs on the fake test clock - pumpUntilFound's
@@ -247,10 +257,12 @@ void main() {
     final noResultsFinder = find.textContaining('No results for');
     for (var attempt = 0; attempt < 30; attempt++) {
       if (noResultsFinder.evaluate().isNotEmpty) break;
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)));
       await tester.pump(const Duration(milliseconds: 50));
     }
 
-    expect(find.textContaining('No results for "nothing matches this"'), findsOneWidget);
+    expect(find.textContaining('No results for "nothing matches this"'),
+        findsOneWidget);
   });
 }

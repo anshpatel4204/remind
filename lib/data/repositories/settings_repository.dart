@@ -18,7 +18,8 @@ class SettingsRepository {
   }
 
   Future<void> setValue(String key, String? value) {
-    return _dataSource.upsert(SettingModel(key: key, value: value, updatedAt: DateTime.now()));
+    return _dataSource.upsert(
+        SettingModel(key: key, value: value, updatedAt: DateTime.now()));
   }
 
   Future<Map<String, String?>> getAllSettings() async {
@@ -36,7 +37,8 @@ class SettingsRepository {
     final raw = await getValue(_keyDefaultTaskPriority);
     if (raw == null) return null;
     final index = int.tryParse(raw);
-    if (index == null || index < 0 || index >= TaskPriority.values.length) return null;
+    if (index == null || index < 0 || index >= TaskPriority.values.length)
+      return null;
     return TaskPriority.values[index];
   }
 

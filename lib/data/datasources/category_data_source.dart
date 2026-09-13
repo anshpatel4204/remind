@@ -31,7 +31,8 @@ class CategoryDataSource {
 
   Future<List<CategoryModel>> getAll() async {
     final Database db = await _appDatabase.database;
-    final rows = await db.query(CategoriesTable.name, orderBy: CategoriesTable.categoryName);
+    final rows = await db.query(CategoriesTable.name,
+        orderBy: CategoriesTable.categoryName);
     return rows.map(CategoryModel.fromMap).toList();
   }
 

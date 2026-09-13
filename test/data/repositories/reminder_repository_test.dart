@@ -18,7 +18,8 @@ void main() {
 
   setUp(() {
     testDb = TestAppDatabase.create();
-    reminderRepository = ReminderRepository(ReminderDataSource(testDb.appDatabase));
+    reminderRepository =
+        ReminderRepository(ReminderDataSource(testDb.appDatabase));
     taskRepository = TaskRepository(
       TaskDataSource(testDb.appDatabase),
       TaskTagDataSource(testDb.appDatabase),
@@ -46,7 +47,8 @@ void main() {
     expect(fetched?.taskId, task.id);
     expect(fetched?.reminderType, ReminderType.alarm);
 
-    await reminderRepository.updateReminder(fetched!.copyWith(isEnabled: false));
+    await reminderRepository
+        .updateReminder(fetched!.copyWith(isEnabled: false));
     final updated = await reminderRepository.getReminder(created.id!);
     expect(updated?.isEnabled, isFalse);
 
@@ -70,7 +72,8 @@ void main() {
 
   test('deleting a task cascades to its reminders', () async {
     final task = await taskRepository.createTask(title: 'Task to delete');
-    await reminderRepository.createReminder(taskId: task.id!, reminderTime: DateTime.now());
+    await reminderRepository.createReminder(
+        taskId: task.id!, reminderTime: DateTime.now());
 
     await taskRepository.deleteTask(task.id!);
 

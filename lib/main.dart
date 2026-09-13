@@ -14,7 +14,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final notificationTransport = NotificationService();
-  final repositories = AppRepositories(notificationTransport: notificationTransport);
+  final repositories =
+      AppRepositories(notificationTransport: notificationTransport);
 
   // Sets up the notification channel/timezone data and wires notification
   // taps back into the app; then asks for POST_NOTIFICATIONS if it hasn't
@@ -38,7 +39,8 @@ Future<void> main() async {
 /// automatically from [repositories]' own [AppRepositories.settingsRepository],
 /// so existing call sites (including tests) do not need to know about it.
 class RemindApp extends StatefulWidget {
-  const RemindApp({super.key, required this.repositories, this.themeController});
+  const RemindApp(
+      {super.key, required this.repositories, this.themeController});
 
   final AppRepositories repositories;
   final ThemeController? themeController;
@@ -53,7 +55,8 @@ class _RemindAppState extends State<RemindApp> {
   @override
   void initState() {
     super.initState();
-    _themeController = widget.themeController ?? ThemeController(widget.repositories.settingsRepository);
+    _themeController = widget.themeController ??
+        ThemeController(widget.repositories.settingsRepository);
     // Fire-and-forget: the app renders immediately with the ThemeMode.system
     // default, then flips (via notifyListeners, which ThemeControllerScope
     // listens to) once any previously-saved preference has loaded - a local

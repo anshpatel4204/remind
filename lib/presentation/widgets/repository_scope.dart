@@ -7,7 +7,8 @@ import '../../data/repositories/app_repositories.dart';
 /// `RepositoryScope.of(context)` instead of constructing their own
 /// repositories or touching SQL/the database directly.
 class RepositoryScope extends InheritedWidget {
-  const RepositoryScope({super.key, required this.repositories, required super.child});
+  const RepositoryScope(
+      {super.key, required this.repositories, required super.child});
 
   final AppRepositories repositories;
 
@@ -18,5 +19,6 @@ class RepositoryScope extends InheritedWidget {
   }
 
   @override
-  bool updateShouldNotify(RepositoryScope oldWidget) => repositories != oldWidget.repositories;
+  bool updateShouldNotify(RepositoryScope oldWidget) =>
+      repositories != oldWidget.repositories;
 }

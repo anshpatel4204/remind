@@ -79,11 +79,13 @@ class RecurrenceRepository {
     int? occurrencesCount,
   }) {
     if (intervalValue < 1) {
-      throw ArgumentError('intervalValue must be at least 1, got $intervalValue');
+      throw ArgumentError(
+          'intervalValue must be at least 1, got $intervalValue');
     }
     if (frequency == RecurrenceFrequency.weekly) {
       if (daysOfWeek == null || daysOfWeek.isEmpty) {
-        throw ArgumentError('A weekly recurrence rule requires at least one day of week');
+        throw ArgumentError(
+            'A weekly recurrence rule requires at least one day of week');
       }
       if (daysOfWeek.any((day) => day < 1 || day > 7)) {
         throw ArgumentError(
@@ -93,13 +95,16 @@ class RecurrenceRepository {
       }
     }
     if (frequency == RecurrenceFrequency.custom && customUnit == null) {
-      throw ArgumentError('A custom recurrence rule requires customUnit to be set');
+      throw ArgumentError(
+          'A custom recurrence rule requires customUnit to be set');
     }
     if (endDate != null && endDate.isBefore(startDate)) {
-      throw ArgumentError('endDate ($endDate) cannot be before startDate ($startDate)');
+      throw ArgumentError(
+          'endDate ($endDate) cannot be before startDate ($startDate)');
     }
     if (occurrencesCount != null && occurrencesCount < 1) {
-      throw ArgumentError('occurrencesCount must be at least 1, got $occurrencesCount');
+      throw ArgumentError(
+          'occurrencesCount must be at least 1, got $occurrencesCount');
     }
   }
 }

@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 /// One slice of a [REmindDonutChart].
 class DonutSegment {
-  const DonutSegment({required this.label, required this.value, required this.color});
+  const DonutSegment(
+      {required this.label, required this.value, required this.color});
 
   final String label;
   final int value;

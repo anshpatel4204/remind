@@ -39,6 +39,7 @@ class SettingsDataSource {
 
   Future<int> delete(String key) async {
     final Database db = await _appDatabase.database;
-    return db.delete(SettingsTable.name, where: '${SettingsTable.key} = ?', whereArgs: [key]);
+    return db.delete(SettingsTable.name,
+        where: '${SettingsTable.key} = ?', whereArgs: [key]);
   }
 }

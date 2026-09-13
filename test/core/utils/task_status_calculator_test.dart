@@ -63,7 +63,8 @@ void main() {
       expect(status, TaskDisplayStatus.pending);
     });
 
-    test('a completed task is Completed even if its due date is in the past', () {
+    test('a completed task is Completed even if its due date is in the past',
+        () {
       final status = TaskStatusCalculator.displayStatusFor(
         taskWith(status: TaskStatus.completed, dueDate: past),
         now: now,
@@ -71,7 +72,8 @@ void main() {
       expect(status, TaskDisplayStatus.completed);
     });
 
-    test('a cancelled task is Cancelled even if its due date is in the past', () {
+    test('a cancelled task is Cancelled even if its due date is in the past',
+        () {
       final status = TaskStatusCalculator.displayStatusFor(
         taskWith(status: TaskStatus.cancelled, dueDate: past),
         now: now,
@@ -107,7 +109,9 @@ void main() {
 
     test('a due date one minute in the past is Overdue', () {
       final status = TaskStatusCalculator.displayStatusFor(
-        taskWith(status: TaskStatus.pending, dueDate: now.subtract(const Duration(minutes: 1))),
+        taskWith(
+            status: TaskStatus.pending,
+            dueDate: now.subtract(const Duration(minutes: 1))),
         now: now,
       );
       expect(status, TaskDisplayStatus.overdue);

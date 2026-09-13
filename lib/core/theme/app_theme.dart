@@ -39,7 +39,8 @@ class AppTheme {
       tertiary: AppColors.brandCyan,
       surface: isDark ? AppColors.darkSurface : AppColors.surface,
       onSurface: isDark ? AppColors.darkTextPrimary : AppColors.textPrimary,
-      onSurfaceVariant: isDark ? AppColors.darkTextSecondary : AppColors.textSecondary,
+      onSurfaceVariant:
+          isDark ? AppColors.darkTextSecondary : AppColors.textSecondary,
       outline: isDark ? AppColors.darkBorder : AppColors.border,
       outlineVariant: isDark ? AppColors.darkBorder : AppColors.border,
       error: AppColors.error,
@@ -49,22 +50,26 @@ class AppTheme {
       brightness: brightness,
       colorScheme: colorScheme,
       textTheme: AppTypography.textTheme(colorScheme),
-      scaffoldBackgroundColor: isDark ? AppColors.darkBackground : AppColors.background,
+      scaffoldBackgroundColor:
+          isDark ? AppColors.darkBackground : AppColors.background,
       appBarTheme: AppBarTheme(
         centerTitle: true,
         scrolledUnderElevation: 1,
-        backgroundColor: isDark ? AppColors.darkBackground : AppColors.background,
+        backgroundColor:
+            isDark ? AppColors.darkBackground : AppColors.background,
         surfaceTintColor: Colors.transparent,
       ),
       cardTheme: CardThemeData(
         elevation: 0,
         color: isDark ? AppColors.darkSurface : Colors.white,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusCard)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusCard)),
         margin: EdgeInsets.zero,
       ),
       chipTheme: ChipThemeData(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusPill)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusPill)),
         side: BorderSide.none,
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -72,7 +77,8 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: 14),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xl, vertical: 14),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -80,7 +86,8 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: 14),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xl, vertical: 14),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -97,7 +104,8 @@ class AppTheme {
           borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
           borderSide: BorderSide.none,
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 14),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: colorScheme.primary,
@@ -115,18 +123,21 @@ class AppTheme {
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(AppSpacing.radiusSheet)),
+          borderRadius: BorderRadius.vertical(
+              top: Radius.circular(AppSpacing.radiusSheet)),
         ),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusSheet)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusSheet)),
       ),
       listTileTheme: ListTileThemeData(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusControl),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 4),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 4),
         minVerticalPadding: 12,
       ),
       dividerTheme: DividerThemeData(

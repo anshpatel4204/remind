@@ -58,7 +58,8 @@ class AppColors {
     TaskPriority.low: brandBlue,
     TaskPriority.medium: warning,
     TaskPriority.high: error,
-    TaskPriority.urgent: Color(0xFFA3272C), // deeper than `high` - ranks above it
+    TaskPriority.urgent:
+        Color(0xFFA3272C), // deeper than `high` - ranks above it
   };
 
   static const Map<TaskPriority, String> priorityLabel = {

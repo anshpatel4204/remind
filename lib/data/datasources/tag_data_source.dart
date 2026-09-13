@@ -45,6 +45,7 @@ class TagDataSource {
 
   Future<int> delete(int id) async {
     final Database db = await _appDatabase.database;
-    return db.delete(TagsTable.name, where: '${TagsTable.id} = ?', whereArgs: [id]);
+    return db
+        .delete(TagsTable.name, where: '${TagsTable.id} = ?', whereArgs: [id]);
   }
 }

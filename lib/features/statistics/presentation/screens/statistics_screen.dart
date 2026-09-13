@@ -60,7 +60,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
 
     return _ScreenStats(
       data: StatisticsCalculator.compute(tasks, now: DateTime.now()),
-      categoryById: {for (final c in categories) if (c.id != null) c.id!: c},
+      categoryById: {
+        for (final c in categories)
+          if (c.id != null) c.id!: c
+      },
     );
   }
 
@@ -143,7 +146,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                const REmindSectionHeader(title: 'Completion rate', icon: Icons.trending_up_outlined),
+                const REmindSectionHeader(
+                    title: 'Completion rate', icon: Icons.trending_up_outlined),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -153,8 +157,11 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                         child: LinearProgressIndicator(
                           value: data.completionRate,
                           minHeight: 10,
-                          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                          valueColor: const AlwaysStoppedAnimation(AppColors.success),
+                          backgroundColor: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest,
+                          valueColor:
+                              const AlwaysStoppedAnimation(AppColors.success),
                         ),
                       ),
                     ),
@@ -163,7 +170,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   ],
                 ),
                 const SizedBox(height: 28),
-                const REmindSectionHeader(title: 'Completed', icon: Icons.event_available_outlined),
+                const REmindSectionHeader(
+                    title: 'Completed', icon: Icons.event_available_outlined),
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -207,7 +215,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                           BarValue(
                             label: i == 6
                                 ? 'Today'
-                                : DateFormat('E').format(data.chartStart.add(Duration(days: i))),
+                                : DateFormat('E').format(
+                                    data.chartStart.add(Duration(days: i))),
                             value: data.completedPerDay[i],
                           ),
                       ],
@@ -215,7 +224,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   ),
                 ),
                 const SizedBox(height: 28),
-                const REmindSectionHeader(title: 'Category Breakdown', icon: Icons.category_outlined),
+                const REmindSectionHeader(
+                    title: 'Category Breakdown', icon: Icons.category_outlined),
                 const SizedBox(height: 12),
                 Card(
                   child: Padding(
@@ -230,12 +240,15 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                               DonutSegment(
                                 label: entry.key == null
                                     ? 'Uncategorized'
-                                    : (categoryById[entry.key]?.name ?? 'Unknown'),
+                                    : (categoryById[entry.key]?.name ??
+                                        'Unknown'),
                                 value: entry.value,
                                 color: entry.key == null
                                     ? Theme.of(context).colorScheme.outline
-                                    : (colorFromHex(categoryById[entry.key]?.color) ??
-                                        kDefaultCategoryColors[categoryById[entry.key]?.name] ??
+                                    : (colorFromHex(
+                                            categoryById[entry.key]?.color) ??
+                                        kDefaultCategoryColors[
+                                            categoryById[entry.key]?.name] ??
                                         Theme.of(context).colorScheme.primary),
                               ),
                           ],
@@ -248,7 +261,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                             children: [
                               for (final entry in data.sortedCategoryCounts())
                                 Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 4),
                                   child: Row(
                                     children: [
                                       Container(
@@ -257,10 +271,18 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                                         decoration: BoxDecoration(
                                           shape: BoxShape.circle,
                                           color: entry.key == null
-                                              ? Theme.of(context).colorScheme.outline
-                                              : (colorFromHex(categoryById[entry.key]?.color) ??
-                                                  kDefaultCategoryColors[categoryById[entry.key]?.name] ??
-                                                  Theme.of(context).colorScheme.primary),
+                                              ? Theme.of(context)
+                                                  .colorScheme
+                                                  .outline
+                                              : (colorFromHex(
+                                                      categoryById[entry.key]
+                                                          ?.color) ??
+                                                  kDefaultCategoryColors[
+                                                      categoryById[entry.key]
+                                                          ?.name] ??
+                                                  Theme.of(context)
+                                                      .colorScheme
+                                                      .primary),
                                         ),
                                       ),
                                       const SizedBox(width: 8),
@@ -268,14 +290,20 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                                         child: Text(
                                           entry.key == null
                                               ? 'Uncategorized'
-                                              : (categoryById[entry.key]?.name ?? 'Unknown'),
+                                              : (categoryById[entry.key]
+                                                      ?.name ??
+                                                  'Unknown'),
                                           overflow: TextOverflow.ellipsis,
-                                          style: Theme.of(context).textTheme.bodySmall,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall,
                                         ),
                                       ),
                                       Text(
                                         '${data.total == 0 ? 0 : (entry.value / data.total * 100).round()}%',
-                                        style: Theme.of(context).textTheme.labelMedium,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .labelMedium,
                                       ),
                                     ],
                                   ),
@@ -288,7 +316,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   ),
                 ),
                 const SizedBox(height: 28),
-                const REmindSectionHeader(title: 'By priority', icon: Icons.flag_outlined),
+                const REmindSectionHeader(
+                    title: 'By priority', icon: Icons.flag_outlined),
                 const SizedBox(height: 12),
                 for (final priority in TaskPriority.values)
                   _BreakdownRow(
@@ -345,7 +374,8 @@ class _BreakdownRow extends StatelessWidget {
             child: LinearProgressIndicator(
               value: fraction,
               minHeight: 8,
-              backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+              backgroundColor:
+                  Theme.of(context).colorScheme.surfaceContainerHighest,
               valueColor: AlwaysStoppedAnimation(color),
             ),
           ),

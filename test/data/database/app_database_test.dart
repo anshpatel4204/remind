@@ -51,14 +51,16 @@ void main() {
     test('seeds exactly the 7 default categories', () async {
       final db = await testDb.appDatabase.database;
       final rows = await db.query(CategoriesTable.name);
-      final names = rows.map((r) => r[CategoriesTable.categoryName] as String).toSet();
+      final names =
+          rows.map((r) => r[CategoriesTable.categoryName] as String).toSet();
 
       expect(rows, hasLength(7));
       expect(names, kDefaultCategoryNames.toSet());
       expect(rows.every((r) => r[CategoriesTable.isDefault] == 1), isTrue);
     });
 
-    test('empty database has no tasks, tags, reminders, or recurrence rules', () async {
+    test('empty database has no tasks, tags, reminders, or recurrence rules',
+        () async {
       final db = await testDb.appDatabase.database;
       expect(await db.query(TasksTable.name), isEmpty);
       expect(await db.query(TagsTable.name), isEmpty);
@@ -111,7 +113,8 @@ void main() {
       final appDatabase = AppDatabase(testDatabasePath: path);
       final db = await appDatabase.database;
 
-      final tasks = await db.query(TasksTable.name, orderBy: TasksTable.createdAt);
+      final tasks =
+          await db.query(TasksTable.name, orderBy: TasksTable.createdAt);
       expect(tasks, hasLength(2));
       expect(tasks[0][TasksTable.title], 'Pre-existing task from v1');
       expect(tasks[0][TasksTable.status], 2); // is_done=1 -> completed
@@ -123,7 +126,8 @@ void main() {
       final categories = await db.query(CategoriesTable.name);
       expect(categories, hasLength(7));
 
-      final tableNames = (await db.rawQuery("SELECT name FROM sqlite_master WHERE type = 'table'"))
+      final tableNames = (await db
+              .rawQuery("SELECT name FROM sqlite_master WHERE type = 'table'"))
           .map((r) => r['name'] as String)
           .toSet();
       expect(tableNames.contains('tasks_old_v1'), isFalse);
@@ -136,8 +140,10 @@ void main() {
   });
 
   group('schema migration v2 -> v3', () {
-    test('adds custom_unit to recurrence_rules and preserves existing rows', () async {
-      final dir = Directory.systemTemp.createTempSync('remind_migration_v2_v3_test_');
+    test('adds custom_unit to recurrence_rules and preserves existing rows',
+        () async {
+      final dir =
+          Directory.systemTemp.createTempSync('remind_migration_v2_v3_test_');
       final path = p.join(dir.path, 'migration_v2_v3_test.db');
 
       // Simulate a device that already has a "version 2" database on disk
@@ -158,12 +164,15 @@ void main() {
           },
         ),
       );
-      final preExistingRuleId = await legacyDb.insert(RecurrenceRulesTable.name, {
+      final preExistingRuleId =
+          await legacyDb.insert(RecurrenceRulesTable.name, {
         RecurrenceRulesTable.frequency: 1, // weekly
         RecurrenceRulesTable.intervalValue: 1,
         RecurrenceRulesTable.daysOfWeek: '1,3,5',
-        RecurrenceRulesTable.startDate: DateTime(2026, 1, 1).millisecondsSinceEpoch,
-        RecurrenceRulesTable.createdAt: DateTime(2026, 1, 1).millisecondsSinceEpoch,
+        RecurrenceRulesTable.startDate:
+            DateTime(2026, 1, 1).millisecondsSinceEpoch,
+        RecurrenceRulesTable.createdAt:
+            DateTime(2026, 1, 1).millisecondsSinceEpoch,
       });
       await legacyDb.close();
 
@@ -193,7 +202,8 @@ void main() {
       dir.deleteSync(recursive: true);
     });
 
-    test('a fresh install at the current version already has custom_unit', () async {
+    test('a fresh install at the current version already has custom_unit',
+        () async {
       final testDb = TestAppDatabase.create();
       final db = await testDb.appDatabase.database;
 
@@ -208,7 +218,8 @@ void main() {
   });
 
   group('database restart (close and reopen the same file)', () {
-    test('data survives closing the database and reopening the same file', () async {
+    test('data survives closing the database and reopening the same file',
+        () async {
       final dir = Directory.systemTemp.createTempSync('remind_restart_test_');
       final path = p.join(dir.path, 'restart_test.db');
 

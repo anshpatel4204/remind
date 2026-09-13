@@ -44,9 +44,12 @@ class REmindBarChart extends StatelessWidget {
                     Container(
                       height: maxValue == 0
                           ? 4
-                          : (height - 44) * (bar.value / maxValue).clamp(0.04, 1.0),
+                          : (height - 44) *
+                              (bar.value / maxValue).clamp(0.04, 1.0),
                       decoration: BoxDecoration(
-                        color: bar.value == 0 ? color.withValues(alpha: 0.15) : color,
+                        color: bar.value == 0
+                            ? color.withValues(alpha: 0.15)
+                            : color,
                         borderRadius: BorderRadius.circular(6),
                       ),
                     ),

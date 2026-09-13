@@ -57,7 +57,8 @@ class FakeNotificationTransport implements NotificationTransport {
 
   @override
   Future<void> initialize({
-    required Future<void> Function(NotificationInteraction interaction) onInteraction,
+    required Future<void> Function(NotificationInteraction interaction)
+        onInteraction,
   }) async {
     _onInteraction = onInteraction;
   }

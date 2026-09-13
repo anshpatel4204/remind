@@ -95,7 +95,8 @@ class TaskDataSource {
       joinArgs.add(tagId);
     }
 
-    final whereClause = whereConditions.isEmpty ? '' : 'WHERE ${whereConditions.join(' AND ')}';
+    final whereClause =
+        whereConditions.isEmpty ? '' : 'WHERE ${whereConditions.join(' AND ')}';
     final sql = '''
 SELECT t.* FROM ${TasksTable.name} t
 $joinClause
@@ -136,7 +137,8 @@ ORDER BY ${_orderByClause(sortBy, ascending)}
   /// a task that matches via more than one tag from appearing twice.
   Future<List<TaskModel>> search(String query, {int limit = 100}) async {
     final Database db = await _appDatabase.database;
-    final escaped = query.replaceAllMapped(RegExp(r'[\\%_]'), (m) => '\\${m[0]}');
+    final escaped =
+        query.replaceAllMapped(RegExp(r'[\\%_]'), (m) => '\\${m[0]}');
     final likeArg = '%$escaped%';
 
     final sql = '''
@@ -166,7 +168,8 @@ LIMIT ?
 
   Future<int> delete(int id) async {
     final Database db = await _appDatabase.database;
-    return db.delete(TasksTable.name, where: '${TasksTable.id} = ?', whereArgs: [id]);
+    return db.delete(TasksTable.name,
+        where: '${TasksTable.id} = ?', whereArgs: [id]);
   }
 
   /// Deletes the task and any recurrence rule it owns, atomically.
@@ -187,9 +190,11 @@ LIMIT ?
         whereArgs: [id],
         limit: 1,
       );
-      final recurrenceRuleId = rows.isEmpty ? null : rows.first[TasksTable.recurrenceRuleId] as int?;
+      final recurrenceRuleId =
+          rows.isEmpty ? null : rows.first[TasksTable.recurrenceRuleId] as int?;
 
-      await txn.delete(TasksTable.name, where: '${TasksTable.id} = ?', whereArgs: [id]);
+      await txn.delete(TasksTable.name,
+          where: '${TasksTable.id} = ?', whereArgs: [id]);
 
       if (recurrenceRuleId != null) {
         await txn.delete(

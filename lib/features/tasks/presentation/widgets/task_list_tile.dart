@@ -50,8 +50,10 @@ class TaskListTile extends StatelessWidget {
       now: DateTime.now(),
       hasActiveSnooze: hasActiveSnooze,
     );
-    final categoryColor =
-        category == null ? null : (colorFromHex(category!.color) ?? kDefaultCategoryColors[category!.name]);
+    final categoryColor = category == null
+        ? null
+        : (colorFromHex(category!.color) ??
+            kDefaultCategoryColors[category!.name]);
     final priorityColor = AppColors.priority[task.priority]!;
 
     return Card(
@@ -78,7 +80,8 @@ class TaskListTile extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Checkbox(value: isCompleted, onChanged: (_) => onToggleComplete()),
+                Checkbox(
+                    value: isCompleted, onChanged: (_) => onToggleComplete()),
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 10),
@@ -88,7 +91,8 @@ class TaskListTile extends StatelessWidget {
                         Text(
                           task.title,
                           style: isCompleted
-                              ? const TextStyle(decoration: TextDecoration.lineThrough)
+                              ? const TextStyle(
+                                  decoration: TextDecoration.lineThrough)
                               : Theme.of(context).textTheme.titleSmall,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -103,20 +107,26 @@ class TaskListTile extends StatelessWidget {
                             if (category != null)
                               Chip(
                                 label: Text(category!.name),
-                                backgroundColor:
-                                    (categoryColor ?? Theme.of(context).colorScheme.secondaryContainer)
-                                        .withValues(alpha: 0.15),
+                                backgroundColor: (categoryColor ??
+                                        Theme.of(context)
+                                            .colorScheme
+                                            .secondaryContainer)
+                                    .withValues(alpha: 0.15),
                                 visualDensity: VisualDensity.compact,
-                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
                               ),
                             for (final tag in tags)
                               Chip(
                                 label: Text('#${tag.name}'),
                                 backgroundColor: (colorFromHex(tag.color) ??
-                                        Theme.of(context).colorScheme.surfaceContainerHighest)
+                                        Theme.of(context)
+                                            .colorScheme
+                                            .surfaceContainerHighest)
                                     .withValues(alpha: 0.3),
                                 visualDensity: VisualDensity.compact,
-                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
                               ),
                           ],
                         ),
@@ -128,7 +138,9 @@ class TaskListTile extends StatelessWidget {
                               Icon(
                                 Icons.schedule,
                                 size: 14,
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                               ),
                               const SizedBox(width: 4),
                               Text(
@@ -145,7 +157,9 @@ class TaskListTile extends StatelessWidget {
                 Column(
                   children: [
                     IconButton(
-                      icon: Icon(task.isPinned ? Icons.push_pin : Icons.push_pin_outlined),
+                      icon: Icon(task.isPinned
+                          ? Icons.push_pin
+                          : Icons.push_pin_outlined),
                       onPressed: onTogglePin,
                       tooltip: task.isPinned ? 'Unpin' : 'Pin',
                     ),

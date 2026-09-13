@@ -62,8 +62,10 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       _status = task.status;
       _categoryId = task.categoryId;
       if (task.dueDate != null) {
-        _dueDate = DateTime(task.dueDate!.year, task.dueDate!.month, task.dueDate!.day);
-        _dueTime = TimeOfDay(hour: task.dueDate!.hour, minute: task.dueDate!.minute);
+        _dueDate = DateTime(
+            task.dueDate!.year, task.dueDate!.month, task.dueDate!.day);
+        _dueTime =
+            TimeOfDay(hour: task.dueDate!.hour, minute: task.dueDate!.minute);
       }
     } else if (widget.initialDueDate != null) {
       final initial = widget.initialDueDate!;
@@ -102,9 +104,13 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     final task = widget.existingTask;
     if (task != null) {
       final taskTags = await repos.taskRepository.getTagsForTask(task.id!);
-      selectedTagIds = {for (final t in taskTags) if (t.id != null) t.id!};
+      selectedTagIds = {
+        for (final t in taskTags)
+          if (t.id != null) t.id!
+      };
 
-      final reminders = await repos.reminderRepository.getRemindersForTask(task.id!);
+      final reminders =
+          await repos.reminderRepository.getRemindersForTask(task.id!);
       existingReminder = reminders.isEmpty ? null : reminders.first;
     }
 
@@ -125,7 +131,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       _selectedTagIds = selectedTagIds;
       if (task == null) {
         if (defaultPriority != null) _priority = defaultPriority;
-        if (defaultCategoryId != null && categories.any((c) => c.id == defaultCategoryId)) {
+        if (defaultCategoryId != null &&
+            categories.any((c) => c.id == defaultCategoryId)) {
           _categoryId = defaultCategoryId;
         }
       }
@@ -155,7 +162,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   DateTime? get _combinedDueDateTime {
     if (_dueDate == null) return null;
     final time = _dueTime ?? const TimeOfDay(hour: 0, minute: 0);
-    return DateTime(_dueDate!.year, _dueDate!.month, _dueDate!.day, time.hour, time.minute);
+    return DateTime(
+        _dueDate!.year, _dueDate!.month, _dueDate!.day, time.hour, time.minute);
   }
 
   DateTime? get _combinedReminderDateTime {
@@ -181,7 +189,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   }
 
   Future<void> _pickDueTime() async {
-    final picked = await showTimePicker(context: context, initialTime: _dueTime ?? TimeOfDay.now());
+    final picked = await showTimePicker(
+        context: context, initialTime: _dueTime ?? TimeOfDay.now());
     if (picked != null) setState(() => _dueTime = picked);
   }
 
@@ -198,7 +207,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   Future<void> _pickReminderTime() async {
     final picked = await showTimePicker(
       context: context,
-      initialTime: _reminderTime ?? _dueTime ?? const TimeOfDay(hour: 9, minute: 0),
+      initialTime:
+          _reminderTime ?? _dueTime ?? const TimeOfDay(hour: 9, minute: 0),
     );
     if (picked != null) setState(() => _reminderTime = picked);
   }
@@ -248,7 +258,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (_reminderEnabled && _reminderDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pick a reminder date, or turn the reminder off.')),
+        const SnackBar(
+            content: Text('Pick a reminder date, or turn the reminder off.')),
       );
       return;
     }
@@ -282,7 +293,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         );
       }
 
-      await repos.taskRepository.setTagsForTask(task.id!, _selectedTagIds.toList());
+      await repos.taskRepository
+          .setTagsForTask(task.id!, _selectedTagIds.toList());
 
       // Routed through notificationScheduler (never reminderRepository
       // directly) so setting/changing/removing a reminder here always
@@ -303,7 +315,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
           );
         }
       } else if (_existingReminder != null) {
-        await repos.notificationScheduler.deleteReminder(_existingReminder!.id!);
+        await repos.notificationScheduler
+            .deleteReminder(_existingReminder!.id!);
       }
 
       if (!mounted) return;
@@ -317,7 +330,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: Text(widget.isEditing ? 'Edit task' : 'Add task')),
+        appBar:
+            AppBar(title: Text(widget.isEditing ? 'Edit task' : 'Add task')),
         body: const REmindLoadingState(),
       );
     }
@@ -342,8 +356,9 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
               controller: _titleController,
               decoration: const InputDecoration(labelText: 'Title'),
               textInputAction: TextInputAction.next,
-              validator: (value) =>
-                  (value == null || value.trim().isEmpty) ? 'Title is required' : null,
+              validator: (value) => (value == null || value.trim().isEmpty)
+                  ? 'Title is required'
+                  : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -357,9 +372,11 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
               initialValue: _priority,
               decoration: const InputDecoration(labelText: 'Priority'),
               items: TaskPriority.values
-                  .map((p) => DropdownMenuItem(value: p, child: Text(_priorityLabel(p))))
+                  .map((p) => DropdownMenuItem(
+                      value: p, child: Text(_priorityLabel(p))))
                   .toList(),
-              onChanged: (value) => setState(() => _priority = value ?? _priority),
+              onChanged: (value) =>
+                  setState(() => _priority = value ?? _priority),
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<int?>(
@@ -367,7 +384,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
               decoration: const InputDecoration(labelText: 'Category'),
               items: [
                 const DropdownMenuItem<int?>(value: null, child: Text('None')),
-                ..._categories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))),
+                ..._categories.map(
+                    (c) => DropdownMenuItem(value: c.id, child: Text(c.name))),
               ],
               onChanged: (value) => setState(() => _categoryId = value),
             ),
@@ -377,12 +395,15 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 initialValue: _status,
                 decoration: const InputDecoration(
                   labelText: 'Status',
-                  helperText: 'Overdue and Snoozed are calculated automatically, not set here.',
+                  helperText:
+                      'Overdue and Snoozed are calculated automatically, not set here.',
                 ),
                 items: TaskStatus.values
-                    .map((s) => DropdownMenuItem(value: s, child: Text(_statusLabel(s))))
+                    .map((s) => DropdownMenuItem(
+                        value: s, child: Text(_statusLabel(s))))
                     .toList(),
-                onChanged: (value) => setState(() => _status = value ?? _status),
+                onChanged: (value) =>
+                    setState(() => _status = value ?? _status),
               ),
             ],
             const SizedBox(height: 20),
@@ -415,14 +436,16 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Due date'),
-              subtitle: Text(_dueDate == null ? 'Not set' : formatDate(_dueDate!)),
+              subtitle:
+                  Text(_dueDate == null ? 'Not set' : formatDate(_dueDate!)),
               trailing: const Icon(Icons.calendar_today_outlined),
               onTap: _pickDueDate,
             ),
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Due time'),
-              subtitle: Text(_dueTime == null ? 'Not set' : _dueTime!.format(context)),
+              subtitle: Text(
+                  _dueTime == null ? 'Not set' : _dueTime!.format(context)),
               trailing: const Icon(Icons.access_time_outlined),
               enabled: _dueDate != null,
               onTap: _dueDate == null ? null : _pickDueTime,
@@ -439,7 +462,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 _reminderEnabled = value;
                 if (value) {
                   _reminderDate ??= _dueDate ?? DateTime.now();
-                  _reminderTime ??= _dueTime ?? const TimeOfDay(hour: 9, minute: 0);
+                  _reminderTime ??=
+                      _dueTime ?? const TimeOfDay(hour: 9, minute: 0);
                 }
               }),
             ),
@@ -447,14 +471,18 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Reminder date'),
-                subtitle: Text(_reminderDate == null ? 'Not set' : formatDate(_reminderDate!)),
+                subtitle: Text(_reminderDate == null
+                    ? 'Not set'
+                    : formatDate(_reminderDate!)),
                 trailing: const Icon(Icons.calendar_today_outlined),
                 onTap: _pickReminderDate,
               ),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Reminder time'),
-                subtitle: Text(_reminderTime == null ? 'Not set' : _reminderTime!.format(context)),
+                subtitle: Text(_reminderTime == null
+                    ? 'Not set'
+                    : _reminderTime!.format(context)),
                 trailing: const Icon(Icons.access_time_outlined),
                 enabled: _reminderDate != null,
                 onTap: _reminderDate == null ? null : _pickReminderTime,

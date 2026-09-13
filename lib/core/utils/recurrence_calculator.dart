@@ -60,7 +60,8 @@ class RecurrenceCalculator {
     bool inclusive = false,
   }) {
     for (final occurrence in _occurrences(rule)) {
-      final qualifies = inclusive ? !occurrence.isBefore(after) : occurrence.isAfter(after);
+      final qualifies =
+          inclusive ? !occurrence.isBefore(after) : occurrence.isAfter(after);
       if (qualifies) return occurrence;
     }
     return null;
@@ -75,16 +76,19 @@ class RecurrenceCalculator {
   static Iterable<DateTime> _occurrences(RecurrenceRuleModel rule) sync* {
     switch (rule.frequency) {
       case RecurrenceFrequency.daily:
-        yield* _unitStepOccurrences(rule, kind: _StepKind.days, amount: rule.intervalValue);
+        yield* _unitStepOccurrences(rule,
+            kind: _StepKind.days, amount: rule.intervalValue);
         return;
       case RecurrenceFrequency.weekly:
         yield* _weeklyOccurrences(rule);
         return;
       case RecurrenceFrequency.monthly:
-        yield* _unitStepOccurrences(rule, kind: _StepKind.months, amount: rule.intervalValue);
+        yield* _unitStepOccurrences(rule,
+            kind: _StepKind.months, amount: rule.intervalValue);
         return;
       case RecurrenceFrequency.yearly:
-        yield* _unitStepOccurrences(rule, kind: _StepKind.months, amount: rule.intervalValue * 12);
+        yield* _unitStepOccurrences(rule,
+            kind: _StepKind.months, amount: rule.intervalValue * 12);
         return;
       case RecurrenceFrequency.custom:
         yield* _customOccurrences(rule);
@@ -104,13 +108,16 @@ class RecurrenceCalculator {
         yield* _unitStepOccurrences(rule, kind: _StepKind.days, amount: amount);
         return;
       case RecurrenceCustomUnit.weeks:
-        yield* _unitStepOccurrences(rule, kind: _StepKind.days, amount: amount * 7);
+        yield* _unitStepOccurrences(rule,
+            kind: _StepKind.days, amount: amount * 7);
         return;
       case RecurrenceCustomUnit.months:
-        yield* _unitStepOccurrences(rule, kind: _StepKind.months, amount: amount);
+        yield* _unitStepOccurrences(rule,
+            kind: _StepKind.months, amount: amount);
         return;
       case RecurrenceCustomUnit.years:
-        yield* _unitStepOccurrences(rule, kind: _StepKind.months, amount: amount * 12);
+        yield* _unitStepOccurrences(rule,
+            kind: _StepKind.months, amount: amount * 12);
         return;
       case null:
         // RecurrenceRepository's validation never lets a custom rule
@@ -147,7 +154,8 @@ class RecurrenceCalculator {
           ? _addDays(rule.startDate, amount * index)
           : _addMonths(rule.startDate, amount * index);
       if (rule.endDate != null && occurrence.isAfter(rule.endDate!)) return;
-      if (rule.occurrencesCount != null && index >= rule.occurrencesCount!) return;
+      if (rule.occurrencesCount != null && index >= rule.occurrencesCount!)
+        return;
       yield occurrence;
       index++;
     }
@@ -185,12 +193,14 @@ class RecurrenceCalculator {
           'computing weekly occurrences for rule ${rule.id}',
         );
       }
-      final blockMonday = _addDays(anchorMonday, block * rule.intervalValue * 7);
+      final blockMonday =
+          _addDays(anchorMonday, block * rule.intervalValue * 7);
       for (final weekday in days) {
         final candidate = _addDays(blockMonday, weekday - 1);
         if (candidate.isBefore(start)) continue;
         if (rule.endDate != null && candidate.isAfter(rule.endDate!)) return;
-        if (rule.occurrencesCount != null && index >= rule.occurrencesCount!) return;
+        if (rule.occurrencesCount != null && index >= rule.occurrencesCount!)
+          return;
         yield candidate;
         index++;
       }
@@ -253,5 +263,6 @@ class RecurrenceCalculator {
   /// *after* the target month is a standard, leap-year-aware Dart idiom:
   /// [DateTime] normalizes "the 0th of month M+1" back to "the last day
   /// of month M".
-  static int _daysInMonth(int year, int month) => DateTime(year, month + 1, 0).day;
+  static int _daysInMonth(int year, int month) =>
+      DateTime(year, month + 1, 0).day;
 }

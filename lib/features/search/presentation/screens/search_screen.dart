@@ -57,7 +57,10 @@ class _SearchScreenState extends State<SearchScreen> {
     final tasks = await repos.taskRepository.searchTasks(query);
 
     final categories = await repos.categoryRepository.getAllCategories();
-    final categoryById = {for (final c in categories) if (c.id != null) c.id!: c};
+    final categoryById = {
+      for (final c in categories)
+        if (c.id != null) c.id!: c
+    };
 
     final now = DateTime.now();
     final tagsByTaskId = <int, List<TagModel>>{};
@@ -67,7 +70,10 @@ class _SearchScreenState extends State<SearchScreen> {
       tagsByTaskId[id] = await repos.taskRepository.getTagsForTask(id);
       final reminders = await repos.reminderRepository.getRemindersForTask(id);
       final hasActiveSnooze = reminders.any(
-        (r) => r.isEnabled && r.snoozedUntil != null && r.snoozedUntil!.isAfter(now),
+        (r) =>
+            r.isEnabled &&
+            r.snoozedUntil != null &&
+            r.snoozedUntil!.isAfter(now),
       );
       if (hasActiveSnooze) activeSnoozeTaskIds.add(id);
     }
@@ -110,7 +116,9 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _togglePin(TaskModel task) async {
-    await RepositoryScope.of(context).taskRepository.setPinned(task.id!, !task.isPinned);
+    await RepositoryScope.of(context)
+        .taskRepository
+        .setPinned(task.id!, !task.isPinned);
     _reload();
   }
 
@@ -119,7 +127,8 @@ class _SearchScreenState extends State<SearchScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete task?'),
-        content: Text('"${task.title}" will be permanently deleted, along with its reminder.'),
+        content: Text(
+            '"${task.title}" will be permanently deleted, along with its reminder.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -201,13 +210,15 @@ class _SearchScreenState extends State<SearchScreen> {
                   itemCount: results.tasks.length,
                   itemBuilder: (context, index) {
                     final task = results.tasks[index];
-                    final category =
-                        task.categoryId == null ? null : results.categoryById[task.categoryId];
+                    final category = task.categoryId == null
+                        ? null
+                        : results.categoryById[task.categoryId];
                     return TaskListTile(
                       task: task,
                       category: category,
                       tags: results.tagsByTaskId[task.id] ?? const [],
-                      hasActiveSnooze: results.activeSnoozeTaskIds.contains(task.id),
+                      hasActiveSnooze:
+                          results.activeSnoozeTaskIds.contains(task.id),
                       onTap: () => _openDetails(task),
                       onToggleComplete: () => _toggleComplete(task),
                       onTogglePin: () => _togglePin(task),

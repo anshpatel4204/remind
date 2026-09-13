@@ -37,9 +37,11 @@ class AppRepositories {
   }) {
     final db = appDatabase ?? AppDatabase.instance;
     final taskTagDataSource = TaskTagDataSource(db);
-    final taskRepository = TaskRepository(TaskDataSource(db), taskTagDataSource);
+    final taskRepository =
+        TaskRepository(TaskDataSource(db), taskTagDataSource);
     final reminderRepository = ReminderRepository(ReminderDataSource(db));
-    final recurrenceRepository = RecurrenceRepository(RecurrenceRuleDataSource(db));
+    final recurrenceRepository =
+        RecurrenceRepository(RecurrenceRuleDataSource(db));
     final reminderEngine = ReminderEngine(
       taskRepository: taskRepository,
       reminderRepository: reminderRepository,

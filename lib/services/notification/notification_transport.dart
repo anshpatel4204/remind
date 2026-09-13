@@ -38,7 +38,8 @@ class NotificationAction {
 /// package's own response type, so [NotificationScheduler] (and its tests)
 /// never need to import one.
 class NotificationInteraction {
-  const NotificationInteraction({required this.notificationId, this.actionId, this.payload});
+  const NotificationInteraction(
+      {required this.notificationId, this.actionId, this.payload});
 
   final int notificationId;
 
@@ -72,7 +73,8 @@ abstract class NotificationTransport {
   /// know an interaction has been fully handled - notably
   /// [NotificationScheduler]'s tests - can await it deterministically.
   Future<void> initialize({
-    required Future<void> Function(NotificationInteraction interaction) onInteraction,
+    required Future<void> Function(NotificationInteraction interaction)
+        onInteraction,
   });
 
   /// Whether the user currently allows this app to post notifications at
@@ -142,7 +144,8 @@ class NoopNotificationTransport implements NotificationTransport {
 
   @override
   Future<void> initialize({
-    required Future<void> Function(NotificationInteraction interaction) onInteraction,
+    required Future<void> Function(NotificationInteraction interaction)
+        onInteraction,
   }) async {}
 
   @override

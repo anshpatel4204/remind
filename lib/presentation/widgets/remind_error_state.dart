@@ -7,7 +7,8 @@ import '../../core/theme/app_spacing.dart';
 /// (Home, Tasks, Calendar, Statistics, Task details) shows this same panel
 /// on error instead of five slightly different hand-rolled ones.
 class REmindErrorState extends StatelessWidget {
-  const REmindErrorState({super.key, required this.message, required this.onRetry});
+  const REmindErrorState(
+      {super.key, required this.message, required this.onRetry});
 
   final String message;
   final VoidCallback onRetry;
@@ -20,7 +21,8 @@ class REmindErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
+            Icon(Icons.error_outline,
+                size: 48, color: Theme.of(context).colorScheme.error),
             const SizedBox(height: AppSpacing.md),
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: AppSpacing.lg),

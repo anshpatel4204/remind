@@ -11,7 +11,17 @@ enum TaskSortOption { dueDate, priority, createdDate, alphabetical }
 /// caller-supplied [TaskFilter.customDueDateFrom]/[TaskFilter.customDueDateTo]
 /// instead of a fixed range. [upcoming] is open-ended (tomorrow onward, no
 /// end) rather than a fixed window.
-enum DueDateFilter { any, today, tomorrow, thisWeek, thisMonth, upcoming, overdue, noDueDate, custom }
+enum DueDateFilter {
+  any,
+  today,
+  tomorrow,
+  thisWeek,
+  thisMonth,
+  upcoming,
+  overdue,
+  noDueDate,
+  custom
+}
 
 /// Bundles every criterion the Task List's filter bar can apply, plus the
 /// chosen sort - one object so the UI has a single source of truth for
@@ -98,13 +108,20 @@ class TaskFilterPresets {
   TaskFilterPresets._();
 
   static const TaskFilter all = TaskFilter();
-  static const TaskFilter today = TaskFilter(dueDateFilter: DueDateFilter.today);
-  static const TaskFilter tomorrow = TaskFilter(dueDateFilter: DueDateFilter.tomorrow);
-  static const TaskFilter thisWeek = TaskFilter(dueDateFilter: DueDateFilter.thisWeek);
-  static const TaskFilter thisMonth = TaskFilter(dueDateFilter: DueDateFilter.thisMonth);
-  static const TaskFilter upcoming = TaskFilter(dueDateFilter: DueDateFilter.upcoming);
-  static const TaskFilter overdue = TaskFilter(status: TaskDisplayStatus.overdue);
-  static const TaskFilter completed = TaskFilter(status: TaskDisplayStatus.completed);
+  static const TaskFilter today =
+      TaskFilter(dueDateFilter: DueDateFilter.today);
+  static const TaskFilter tomorrow =
+      TaskFilter(dueDateFilter: DueDateFilter.tomorrow);
+  static const TaskFilter thisWeek =
+      TaskFilter(dueDateFilter: DueDateFilter.thisWeek);
+  static const TaskFilter thisMonth =
+      TaskFilter(dueDateFilter: DueDateFilter.thisMonth);
+  static const TaskFilter upcoming =
+      TaskFilter(dueDateFilter: DueDateFilter.upcoming);
+  static const TaskFilter overdue =
+      TaskFilter(status: TaskDisplayStatus.overdue);
+  static const TaskFilter completed =
+      TaskFilter(status: TaskDisplayStatus.completed);
 
   /// Label + preset pairs, in the order they should appear as quick-filter
   /// chips.
