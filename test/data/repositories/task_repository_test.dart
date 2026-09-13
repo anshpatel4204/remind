@@ -593,4 +593,57 @@ void main() {
       expect(byPriority.first.title, 'Aardvark, but pinned');
     });
   });
+
+  group('large dataset (correctness at scale)', () {
+    test('creating, filtering, sorting, and searching hold up across ~500 tasks', () async {
+      final categories = await categoryRepository.getAllCategories();
+      final work = categories.firstWhere((c) => c.name == 'Work');
+      final personal = categories.firstWhere((c) => c.name == 'Personal');
+      final tag = await tagRepository.createTag(name: 'bulk');
+
+      const total = 500;
+      for (var i = 0; i < total; i++) {
+        final isWork = i.isEven;
+        await taskRepository.createTask(
+          title: 'Bulk task #$i',
+          categoryId: isWork ? work.id : personal.id,
+          priority: TaskPriority.values[i % TaskPriority.values.length],
+          dueDate: DateTime(2026, 1, 1).add(Duration(days: i % 30)),
+          tagIds: i % 10 == 0 ? [tag.id!] : const [],
+        );
+      }
+      // One easy-to-find needle for the search assertion below.
+      await taskRepository.createTask(title: 'Findable Needle Task');
+
+      final all = await taskRepository.getAllTasks();
+      expect(all, hasLength(total + 1));
+
+      final workOnly = await taskRepository.getAllTasks(categoryId: work.id);
+      expect(workOnly, hasLength(total ~/ 2));
+
+      final filtered = await taskRepository.getFilteredTasks(
+        const TaskFilter(sortBy: TaskSortOption.priority, ascending: false),
+      );
+      expect(filtered, hasLength(total + 1));
+
+      final tagged = await taskRepository.getAllTasks(tagId: tag.id);
+      expect(tagged, hasLength(total ~/ 10));
+
+      final found = await taskRepository.searchTasks('Findable Needle');
+      expect(found, hasLength(1));
+      expect(found.single.title, 'Findable Needle Task');
+
+      final sorted = await taskRepository.getAllTasks(
+        sortBy: TaskSortOption.alphabetical,
+        ascending: true,
+      );
+      expect(sorted, hasLength(total + 1));
+      for (var i = 1; i < sorted.length; i++) {
+        expect(
+          sorted[i - 1].title.toLowerCase().compareTo(sorted[i].title.toLowerCase()) <= 0,
+          isTrue,
+        );
+      }
+    });
+  });
 }

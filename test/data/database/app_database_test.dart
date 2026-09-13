@@ -206,4 +206,46 @@ void main() {
       await testDb.tearDown();
     });
   });
+
+  group('database restart (close and reopen the same file)', () {
+    test('data survives closing the database and reopening the same file', () async {
+      final dir = Directory.systemTemp.createTempSync('remind_restart_test_');
+      final path = p.join(dir.path, 'restart_test.db');
+
+      var appDatabase = AppDatabase(testDatabasePath: path);
+      var db = await appDatabase.database;
+
+      final category = await db.query(CategoriesTable.name, limit: 1);
+      final categoryId = category.first[CategoriesTable.id];
+      final taskId = await db.insert(TasksTable.name, {
+        TasksTable.title: 'Task that must survive a restart',
+        TasksTable.status: 0,
+        TasksTable.priority: 1,
+        TasksTable.categoryId: categoryId,
+        TasksTable.createdAt: 1000,
+        TasksTable.updatedAt: 1000,
+      });
+
+      // Simulate the app being killed and relaunched: close the database
+      // connection entirely, then open a fresh AppDatabase against the same
+      // on-disk file, exactly as would happen on the next app launch.
+      await appDatabase.close();
+      appDatabase = AppDatabase(testDatabasePath: path);
+      db = await appDatabase.database;
+
+      final tasks = await db.query(TasksTable.name);
+      expect(tasks, hasLength(1));
+      expect(tasks.first[TasksTable.id], taskId);
+      expect(tasks.first[TasksTable.title], 'Task that must survive a restart');
+
+      // The default categories must not be re-seeded a second time (that
+      // would indicate the reopen ran onCreate again instead of recognizing
+      // the existing database).
+      final categories = await db.query(CategoriesTable.name);
+      expect(categories, hasLength(7));
+
+      await appDatabase.close();
+      dir.deleteSync(recursive: true);
+    });
+  });
 }

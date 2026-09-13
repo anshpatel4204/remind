@@ -9,5 +9,5 @@ class AppConstants {
   /// Displayed in Settings > Data and in the About dialog. Bump this by
   /// hand alongside pubspec.yaml's own version when it changes - the two
   /// are not linked automatically.
-  static const String appVersion = '0.1.0';
+  static const String appVersion = '1.0.0';
 }
