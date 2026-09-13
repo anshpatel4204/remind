@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/category_model.dart';
 import '../../../../data/models/enums.dart';
 import '../../../../data/models/tag_model.dart';
@@ -246,7 +247,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: Icons.check_circle_outline,
                       label: 'Completed',
                       count: data.completedCount,
-                      color: Colors.green,
+                      color: AppColors.success,
                       onTap: () => _openFiltered(_completedFilter),
                     ),
                   ],

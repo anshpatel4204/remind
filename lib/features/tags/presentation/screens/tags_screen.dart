@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../data/models/tag_model.dart';
+import '../../../../presentation/widgets/remind_empty_state.dart';
+import '../../../../presentation/widgets/remind_error_state.dart';
 import '../../../../presentation/widgets/remind_loading_state.dart';
 import '../../../../presentation/widgets/repository_scope.dart';
 
@@ -126,33 +128,21 @@ class _TagsScreenState extends State<TagsScreen> {
       body: FutureBuilder<List<TagModel>>(
         future: _future,
         builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return REmindErrorState(
+              message: 'Something went wrong loading your tags.',
+              onRetry: _reload,
+            );
+          }
           if (snapshot.connectionState != ConnectionState.done) {
             return const REmindLoadingState();
           }
           final tags = snapshot.data!;
           if (tags.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.label_outline,
-                      size: 48,
-                      color: Theme.of(context).colorScheme.outline,
-                    ),
-                    const SizedBox(height: 12),
-                    Text('No tags yet', style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Tap + to create your first tag.',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
+            return const REmindEmptyState(
+              icon: Icons.label_outline,
+              title: 'No tags yet',
+              message: 'Tap + to create your first tag.',
             );
           }
           return ListView.separated(

@@ -11,6 +11,8 @@ class ScheduledNotification {
     required this.actions,
     this.payload,
     required this.exact,
+    required this.soundEnabled,
+    required this.vibrationEnabled,
   });
 
   final int id;
@@ -20,6 +22,8 @@ class ScheduledNotification {
   final List<NotificationAction> actions;
   final String? payload;
   final bool exact;
+  final bool soundEnabled;
+  final bool vibrationEnabled;
 }
 
 /// An in-memory [NotificationTransport] for tests.
@@ -79,6 +83,8 @@ class FakeNotificationTransport implements NotificationTransport {
     required List<NotificationAction> actions,
     String? payload,
     bool exact = true,
+    bool soundEnabled = true,
+    bool vibrationEnabled = true,
   }) async {
     calls.add('schedule:$id');
     scheduled[id] = ScheduledNotification(
@@ -89,6 +95,8 @@ class FakeNotificationTransport implements NotificationTransport {
       actions: actions,
       payload: payload,
       exact: exact,
+      soundEnabled: soundEnabled,
+      vibrationEnabled: vibrationEnabled,
     );
   }
 

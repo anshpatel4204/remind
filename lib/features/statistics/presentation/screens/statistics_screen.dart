@@ -120,7 +120,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       icon: Icons.check_circle_outline,
                       label: 'Completed',
                       count: data.completed,
-                      color: Colors.green,
+                      color: AppColors.success,
                     ),
                     REmindStatCard(
                       icon: Icons.schedule_outlined,
@@ -154,7 +154,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                           value: data.completionRate,
                           minHeight: 10,
                           backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                          valueColor: const AlwaysStoppedAnimation(Colors.green),
+                          valueColor: const AlwaysStoppedAnimation(AppColors.success),
                         ),
                       ),
                     ),
@@ -171,7 +171,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       child: REmindStatCard(
                         label: 'Today',
                         count: data.completedToday,
-                        color: Colors.green,
+                        color: AppColors.success,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -179,7 +179,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       child: REmindStatCard(
                         label: 'This week',
                         count: data.completedThisWeek,
-                        color: Colors.green,
+                        color: AppColors.success,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -187,7 +187,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       child: REmindStatCard(
                         label: 'This month',
                         count: data.completedThisMonth,
-                        color: Colors.green,
+                        color: AppColors.success,
                       ),
                     ),
                   ],

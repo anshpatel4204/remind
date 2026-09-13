@@ -9,6 +9,7 @@ import '../../../../data/models/enums.dart';
 import '../../../../data/models/reminder_model.dart';
 import '../../../../data/models/tag_model.dart';
 import '../../../../data/models/task_model.dart';
+import '../../../../presentation/widgets/remind_empty_state.dart';
 import '../../../../presentation/widgets/remind_error_state.dart';
 import '../../../../presentation/widgets/remind_loading_state.dart';
 import '../../../../presentation/widgets/repository_scope.dart';
@@ -203,16 +204,20 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
           }
           final data = snapshot.data;
           if (data == null) {
-            return const Center(child: Text('This task no longer exists.'));
+            return const REmindEmptyState(
+              icon: Icons.task_outlined,
+              title: 'This task no longer exists',
+              message: 'It may have been deleted from another screen.',
+            );
           }
           return Stack(
             children: [
               _buildBody(context, data),
               if (_busy)
-                const Positioned.fill(
+                Positioned.fill(
                   child: ColoredBox(
-                    color: Colors.black12,
-                    child: Center(child: CircularProgressIndicator()),
+                    color: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.32),
+                    child: const Center(child: CircularProgressIndicator()),
                   ),
                 ),
             ],

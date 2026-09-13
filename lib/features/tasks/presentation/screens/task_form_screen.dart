@@ -108,14 +108,30 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       existingReminder = reminders.isEmpty ? null : reminders.first;
     }
 
+    // Only a brand-new task picks up the Settings > Tasks defaults - an
+    // existing task's own saved priority/category always wins, exactly
+    // like initState() already treats initialDueDate as new-task-only.
+    TaskPriority? defaultPriority;
+    int? defaultCategoryId;
+    if (task == null) {
+      defaultPriority = await repos.settingsRepository.getDefaultTaskPriority();
+      defaultCategoryId = await repos.settingsRepository.getDefaultCategoryId();
+    }
+
     if (!mounted) return;
     setState(() {
       _categories = categories;
       _tags = tags;
       _selectedTagIds = selectedTagIds;
-      // A category the task pointed to may since have been deleted (the
-      // dropdown would otherwise crash trying to show a value with no
-      // matching item).
+      if (task == null) {
+        if (defaultPriority != null) _priority = defaultPriority;
+        if (defaultCategoryId != null && categories.any((c) => c.id == defaultCategoryId)) {
+          _categoryId = defaultCategoryId;
+        }
+      }
+      // A category the task pointed to (or a stale default above) may
+      // since have been deleted (the dropdown would otherwise crash
+      // trying to show a value with no matching item).
       if (_categoryId != null && !categories.any((c) => c.id == _categoryId)) {
         _categoryId = null;
       }

@@ -1,6 +1,7 @@
 import '../../data/models/enums.dart';
 import '../../data/models/reminder_model.dart';
 import '../../data/repositories/reminder_repository.dart';
+import '../../data/repositories/settings_repository.dart';
 import '../../data/repositories/task_repository.dart';
 import 'notification_transport.dart';
 import '../reminder/reminder_engine.dart';
@@ -48,15 +49,42 @@ class NotificationScheduler {
     required TaskRepository taskRepository,
     required ReminderRepository reminderRepository,
     required ReminderEngine reminderEngine,
+    required SettingsRepository settingsRepository,
   })  : _transport = transport,
         _taskRepository = taskRepository,
         _reminderRepository = reminderRepository,
-        _reminderEngine = reminderEngine;
+        _reminderEngine = reminderEngine,
+        _settingsRepository = settingsRepository;
 
   final NotificationTransport _transport;
   final TaskRepository _taskRepository;
   final ReminderRepository _reminderRepository;
   final ReminderEngine _reminderEngine;
+  final SettingsRepository _settingsRepository;
+
+  // Settings keys for this screen's in-app notification preferences -
+  // deliberately separate from the OS-level permission state
+  // ([notificationsEnabled]/[canScheduleExactAlarms]), which the app can
+  // only ever read/request, never override. Unset means "on" for the
+  // three booleans, matching the app's previous (pre-Part-11) behavior
+  // exactly, so upgrading to this version never silently mutes an
+  // existing install.
+  static const String _keyMasterEnabled = 'notifications_master_enabled';
+  static const String _keySoundEnabled = 'notifications_sound_enabled';
+  static const String _keyVibrationEnabled = 'notifications_vibration_enabled';
+  static const String _keyDefaultSnooze = 'notifications_default_snooze';
+
+  /// The presets a user can pick as their default - [SnoozeOption.tomorrow]
+  /// and [SnoozeOption.custom] are deliberately excluded: both need an
+  /// explicit in-the-moment choice (a date, or a custom duration) that a
+  /// stored "default" can't sensibly stand in for.
+  static const List<SnoozeOption> defaultableSnoozeOptions = [
+    SnoozeOption.fiveMinutes,
+    SnoozeOption.tenMinutes,
+    SnoozeOption.fifteenMinutes,
+    SnoozeOption.thirtyMinutes,
+    SnoozeOption.oneHour,
+  ];
 
   static const List<NotificationAction> _actions = [
     NotificationAction(id: NotificationActionIds.complete, title: 'Complete'),
@@ -93,6 +121,68 @@ class NotificationScheduler {
   Future<bool> notificationsEnabled() => _transport.areNotificationsEnabled();
 
   Future<bool> canScheduleExactAlarms() => _transport.canScheduleExactNotifications();
+
+  /// Whether REmind should post reminder notifications at all - an
+  /// in-app master switch, independent of (and layered on top of) the
+  /// OS-level permission [notificationsEnabled] reports. Reminder rows
+  /// are always created/updated normally either way; this only decides
+  /// whether [_scheduleNotificationFor] actually reaches the platform.
+  Future<bool> notificationsMasterEnabled() async {
+    final raw = await _settingsRepository.getValue(_keyMasterEnabled);
+    return raw == null ? true : raw == 'true';
+  }
+
+  /// Turning this off immediately cancels every currently scheduled/shown
+  /// notification (nothing left buzzing after the user says "stop").
+  /// Turning it back on re-schedules everything that should currently be
+  /// active, the same way app startup does.
+  Future<void> setNotificationsMasterEnabled(bool enabled) async {
+    await _settingsRepository.setValue(_keyMasterEnabled, enabled.toString());
+    if (enabled) {
+      await reconcileAfterStartup();
+    } else {
+      await _transport.cancelAll();
+    }
+  }
+
+  Future<bool> soundEnabled() async {
+    final raw = await _settingsRepository.getValue(_keySoundEnabled);
+    return raw == null ? true : raw == 'true';
+  }
+
+  Future<void> setSoundEnabled(bool enabled) {
+    return _settingsRepository.setValue(_keySoundEnabled, enabled.toString());
+  }
+
+  Future<bool> vibrationEnabled() async {
+    final raw = await _settingsRepository.getValue(_keyVibrationEnabled);
+    return raw == null ? true : raw == 'true';
+  }
+
+  Future<void> setVibrationEnabled(bool enabled) {
+    return _settingsRepository.setValue(_keyVibrationEnabled, enabled.toString());
+  }
+
+  /// The [SnoozeOption] applied when a notification's own Snooze action
+  /// button is tapped (see [handleInteraction]) - there is no way to show
+  /// an in-app duration picker from a background/killed-app tap, so it
+  /// always needs a concrete fallback. Defaults to [SnoozeOption.tenMinutes],
+  /// matching the app's previous (pre-Part-11) hardcoded behavior.
+  Future<SnoozeOption> defaultSnoozeOption() async {
+    final raw = await _settingsRepository.getValue(_keyDefaultSnooze);
+    for (final option in defaultableSnoozeOptions) {
+      if (option.name == raw) return option;
+    }
+    return SnoozeOption.tenMinutes;
+  }
+
+  Future<void> setDefaultSnoozeOption(SnoozeOption option) {
+    assert(
+      defaultableSnoozeOptions.contains(option),
+      'defaultSnoozeOption must be one of defaultableSnoozeOptions',
+    );
+    return _settingsRepository.setValue(_keyDefaultSnooze, option.name);
+  }
 
   /// Creates a new reminder for [taskId] and schedules its notification in
   /// the same step, so a reminder row is never left without a matching
@@ -204,11 +294,11 @@ class NotificationScheduler {
         return;
       case NotificationActionIds.snooze:
         // A notification action button fires immediately - there is no
-        // way to show an in-app duration picker from it, so it applies a
-        // sensible fixed default. The full set of presets (and a custom
-        // duration) is available via [snoozeReminder] for an in-app
-        // snooze control.
-        await snoozeReminder(reminderId, option: SnoozeOption.tenMinutes);
+        // way to show an in-app duration picker from it, so it applies
+        // the user's configured default (see [defaultSnoozeOption]). The
+        // full set of presets (and a custom duration) is available via
+        // [snoozeReminder] for an in-app snooze control.
+        await snoozeReminder(reminderId, option: await defaultSnoozeOption());
         return;
       case NotificationActionIds.dismiss:
         await _transport.cancel(reminderId);
@@ -330,8 +420,16 @@ class NotificationScheduler {
     final reminderId = reminder.id;
     if (reminderId == null) return;
 
+    // The in-app master switch is checked here, in the one place every
+    // scheduling path funnels through, rather than in each caller - the
+    // reminder row itself is always created/updated normally either way,
+    // only the actual platform notification is skipped while this is off.
+    if (!await notificationsMasterEnabled()) return;
+
     final task = await _taskRepository.getTask(reminder.taskId);
     final exact = exactOverride ?? await _transport.canScheduleExactNotifications();
+    final sound = await soundEnabled();
+    final vibration = await vibrationEnabled();
 
     await _transport.schedule(
       id: reminderId,
@@ -341,6 +439,8 @@ class NotificationScheduler {
       actions: _actions,
       payload: reminderId.toString(),
       exact: exact,
+      soundEnabled: sound,
+      vibrationEnabled: vibration,
     );
 
     if (reminder.notificationId != reminderId) {

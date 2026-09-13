@@ -4,6 +4,8 @@ import '../../../../core/constants/category_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/color_utils.dart';
 import '../../../../data/models/category_model.dart';
+import '../../../../presentation/widgets/remind_empty_state.dart';
+import '../../../../presentation/widgets/remind_error_state.dart';
 import '../../../../presentation/widgets/remind_loading_state.dart';
 import '../../../../presentation/widgets/repository_scope.dart';
 
@@ -175,11 +177,24 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       body: FutureBuilder<_CategoriesData>(
         future: _future,
         builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return REmindErrorState(
+              message: 'Something went wrong loading your categories.',
+              onRetry: _reload,
+            );
+          }
           if (snapshot.connectionState != ConnectionState.done) {
             return const REmindLoadingState();
           }
           final data = snapshot.data!;
           final categories = data.categories;
+          if (categories.isEmpty) {
+            return const REmindEmptyState(
+              icon: Icons.category_outlined,
+              title: 'No categories yet',
+              message: 'Tap + to create your first category.',
+            );
+          }
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 88),
             itemCount: categories.length,

@@ -13,12 +13,38 @@ import 'notification_transport.dart';
 /// else, including [NotificationScheduler]'s tests, only ever depends on
 /// the plain [NotificationTransport] interface.
 class NotificationService implements NotificationTransport {
-  static const String _channelId = 'reminders';
-  static const String _channelName = 'Task reminders';
+  // Android fixes a notification channel's sound/vibration the moment
+  // the channel is first created - later calls that pass different
+  // AndroidNotificationDetails for the *same* channel id are silently
+  // ignored by the OS. So instead of one channel, REmind creates all 4
+  // sound/vibration combinations up front and [schedule] just picks the
+  // channel matching the user's current settings - the plugin call sees
+  // a "new" channel per combination, never a channel changing shape.
   static const String _channelDescription = 'Notifications for REmind task reminders';
 
   final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
+
+  static String _channelId(bool soundEnabled, bool vibrationEnabled) {
+    if (soundEnabled && vibrationEnabled) return 'reminders_sound_vibrate';
+    if (soundEnabled) return 'reminders_sound_only';
+    if (vibrationEnabled) return 'reminders_vibrate_only';
+    return 'reminders_silent';
+  }
+
+  static String _channelName(bool soundEnabled, bool vibrationEnabled) {
+    if (soundEnabled && vibrationEnabled) return 'Task reminders (sound & vibration)';
+    if (soundEnabled) return 'Task reminders (sound only)';
+    if (vibrationEnabled) return 'Task reminders (vibration only)';
+    return 'Task reminders (silent)';
+  }
+
+  static const List<List<bool>> _channelCombinations = [
+    [true, true],
+    [true, false],
+    [false, true],
+    [false, false],
+  ];
 
   AndroidFlutterLocalNotificationsPlugin? get _androidPlugin =>
       _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
@@ -62,14 +88,20 @@ class NotificationService implements NotificationTransport {
       onDidReceiveBackgroundNotificationResponse: notificationBackgroundEntryPoint,
     );
 
-    await _androidPlugin?.createNotificationChannel(
-      const AndroidNotificationChannel(
-        _channelId,
-        _channelName,
-        description: _channelDescription,
-        importance: Importance.high,
-      ),
-    );
+    for (final combination in _channelCombinations) {
+      final soundEnabled = combination[0];
+      final vibrationEnabled = combination[1];
+      await _androidPlugin?.createNotificationChannel(
+        AndroidNotificationChannel(
+          _channelId(soundEnabled, vibrationEnabled),
+          _channelName(soundEnabled, vibrationEnabled),
+          description: _channelDescription,
+          importance: Importance.high,
+          playSound: soundEnabled,
+          enableVibration: vibrationEnabled,
+        ),
+      );
+    }
 
     _initialized = true;
   }
@@ -98,14 +130,18 @@ class NotificationService implements NotificationTransport {
     required List<NotificationAction> actions,
     String? payload,
     bool exact = true,
+    bool soundEnabled = true,
+    bool vibrationEnabled = true,
   }) async {
     final notificationDetails = NotificationDetails(
       android: AndroidNotificationDetails(
-        _channelId,
-        _channelName,
+        _channelId(soundEnabled, vibrationEnabled),
+        _channelName(soundEnabled, vibrationEnabled),
         channelDescription: _channelDescription,
         importance: Importance.high,
         priority: Priority.high,
+        playSound: soundEnabled,
+        enableVibration: vibrationEnabled,
         actions: actions
             .map((action) => AndroidNotificationAction(
                   action.id,

@@ -96,6 +96,19 @@ void main() {
     await pumpUntilFound(tester, find.text('No tasks yet'));
 
     expect(find.text('No tasks yet'), findsOneWidget);
+
+    // The Settings tab stays mounted in the background the whole time
+    // (see main_shell.dart's IndexedStack), and Part 11 gave it a much
+    // longer chain of sequential database reads on startup than before.
+    // This test finds its own "No tasks yet" fast enough that it would
+    // otherwise finish - and tearDown() would close the database - while
+    // Settings' load is still mid-flight, leaving one of
+    // sqflite_common_ffi's internal lock-diagnostic Timers pending and
+    // tripping flutter_test's "Timer still pending" assertion. Waiting
+    // for a widget that only renders once Settings' own load finishes
+    // (see _SettingsScreenState.build's `if (data == null)` guard) lets
+    // that background chain settle first.
+    await pumpUntilFound(tester, find.text('Appearance'));
   });
 
   testWidgets('Creating a task from the Tasks tab shows it in the list', (

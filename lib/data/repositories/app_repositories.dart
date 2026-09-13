@@ -45,12 +45,13 @@ class AppRepositories {
       reminderRepository: reminderRepository,
       recurrenceRepository: recurrenceRepository,
     );
+    final settingsRepository = SettingsRepository(SettingsDataSource(db));
     return AppRepositories._(
       taskRepository: taskRepository,
       reminderRepository: reminderRepository,
       categoryRepository: CategoryRepository(CategoryDataSource(db)),
       tagRepository: TagRepository(TagDataSource(db), taskTagDataSource),
-      settingsRepository: SettingsRepository(SettingsDataSource(db)),
+      settingsRepository: settingsRepository,
       recurrenceRepository: recurrenceRepository,
       reminderEngine: reminderEngine,
       notificationScheduler: NotificationScheduler(
@@ -58,6 +59,7 @@ class AppRepositories {
         taskRepository: taskRepository,
         reminderRepository: reminderRepository,
         reminderEngine: reminderEngine,
+        settingsRepository: settingsRepository,
       ),
       backupRepository: BackupRepository(db),
     );

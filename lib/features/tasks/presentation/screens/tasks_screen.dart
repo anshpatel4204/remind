@@ -293,8 +293,8 @@ class _TasksScreenState extends State<TasksScreen> {
                     children: [
                       const Icon(Icons.filter_alt, size: 16),
                       const SizedBox(width: 6),
-                      const Expanded(
-                        child: Text('Filters active', style: TextStyle(fontSize: 12)),
+                      Expanded(
+                        child: Text('Filters active', style: Theme.of(context).textTheme.labelSmall),
                       ),
                       TextButton(onPressed: _clearFilters, child: const Text('Clear')),
                     ],
@@ -394,7 +394,7 @@ class _QuickDateChip extends StatelessWidget {
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
       selectedColor: Theme.of(context).colorScheme.primary,
       labelStyle: TextStyle(
-        color: selected ? Colors.white : Theme.of(context).colorScheme.onSurface,
+        color: selected ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).colorScheme.onSurface,
         fontWeight: FontWeight.w600,
       ),
     );

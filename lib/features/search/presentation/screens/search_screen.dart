@@ -7,6 +7,7 @@ import '../../../../data/models/enums.dart';
 import '../../../../data/models/tag_model.dart';
 import '../../../../data/models/task_model.dart';
 import '../../../../presentation/widgets/remind_empty_state.dart';
+import '../../../../presentation/widgets/remind_error_state.dart';
 import '../../../../presentation/widgets/remind_loading_state.dart';
 import '../../../../presentation/widgets/repository_scope.dart';
 import '../../../tasks/presentation/screens/task_details_screen.dart';
@@ -157,6 +158,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 ? null
                 : IconButton(
                     icon: const Icon(Icons.clear),
+                    tooltip: 'Clear search',
                     onPressed: () {
                       _controller.clear();
                       setState(() {
@@ -177,6 +179,12 @@ class _SearchScreenState extends State<SearchScreen> {
           : FutureBuilder<_SearchResults>(
               future: _future,
               builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return REmindErrorState(
+                    message: 'Something went wrong running that search.',
+                    onRetry: _reload,
+                  );
+                }
                 if (snapshot.connectionState != ConnectionState.done) {
                   return const REmindLoadingState();
                 }

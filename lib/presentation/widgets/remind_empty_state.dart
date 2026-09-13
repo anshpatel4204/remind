@@ -65,7 +65,7 @@ class REmindEmptyState extends StatelessWidget {
     );
 
     final padded = Padding(
-      padding: EdgeInsets.all(compact ? AppSpacing.xxl : AppSpacing.xxl),
+      padding: EdgeInsets.all(compact ? AppSpacing.lg : AppSpacing.xxl),
       child: content,
     );
 

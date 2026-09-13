@@ -2,11 +2,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:remind/data/datasources/recurrence_rule_data_source.dart';
 import 'package:remind/data/datasources/reminder_data_source.dart';
+import 'package:remind/data/datasources/settings_data_source.dart';
 import 'package:remind/data/datasources/task_data_source.dart';
 import 'package:remind/data/datasources/task_tag_data_source.dart';
 import 'package:remind/data/models/enums.dart';
 import 'package:remind/data/repositories/recurrence_repository.dart';
 import 'package:remind/data/repositories/reminder_repository.dart';
+import 'package:remind/data/repositories/settings_repository.dart';
 import 'package:remind/data/repositories/task_repository.dart';
 import 'package:remind/services/notification/notification_scheduler.dart';
 import 'package:remind/services/notification/notification_transport.dart';
@@ -23,6 +25,7 @@ void main() {
   late ReminderRepository reminderRepository;
   late RecurrenceRepository recurrenceRepository;
   late ReminderEngine reminderEngine;
+  late SettingsRepository settingsRepository;
   late FakeNotificationTransport transport;
   late NotificationScheduler scheduler;
 
@@ -39,12 +42,14 @@ void main() {
       reminderRepository: reminderRepository,
       recurrenceRepository: recurrenceRepository,
     );
+    settingsRepository = SettingsRepository(SettingsDataSource(testDb.appDatabase));
     transport = FakeNotificationTransport();
     scheduler = NotificationScheduler(
       transport: transport,
       taskRepository: taskRepository,
       reminderRepository: reminderRepository,
       reminderEngine: reminderEngine,
+      settingsRepository: settingsRepository,
     );
   });
 
@@ -466,6 +471,117 @@ void main() {
       await scheduler.reconcileAfterStartup(now: DateTime(2026, 9, 15));
 
       expect(transport.scheduled.containsKey(424242), isFalse);
+    });
+  });
+
+  group('in-app notification settings', () {
+    test('sound/vibration default to on and are passed through to the transport', () async {
+      expect(await scheduler.soundEnabled(), isTrue);
+      expect(await scheduler.vibrationEnabled(), isTrue);
+
+      final task = await taskRepository.createTask(title: 'Water the plants');
+      final reminder = await scheduler.createAndScheduleReminder(
+        taskId: task.id!,
+        reminderTime: DateTime(2026, 9, 20, 9, 0),
+      );
+
+      final scheduled = transport.scheduled[reminder.id]!;
+      expect(scheduled.soundEnabled, isTrue);
+      expect(scheduled.vibrationEnabled, isTrue);
+    });
+
+    test('turning sound/vibration off is reflected in the next scheduled notification', () async {
+      await scheduler.setSoundEnabled(false);
+      await scheduler.setVibrationEnabled(false);
+
+      final task = await taskRepository.createTask(title: 'Water the plants');
+      final reminder = await scheduler.createAndScheduleReminder(
+        taskId: task.id!,
+        reminderTime: DateTime(2026, 9, 20, 9, 0),
+      );
+
+      final scheduled = transport.scheduled[reminder.id]!;
+      expect(scheduled.soundEnabled, isFalse);
+      expect(scheduled.vibrationEnabled, isFalse);
+    });
+
+    test('the master switch defaults to on', () async {
+      expect(await scheduler.notificationsMasterEnabled(), isTrue);
+    });
+
+    test('turning the master switch off cancels everything and stops new scheduling', () async {
+      final task = await taskRepository.createTask(title: 'Water the plants');
+      final reminder = await scheduler.createAndScheduleReminder(
+        taskId: task.id!,
+        reminderTime: DateTime(2026, 9, 20, 9, 0),
+      );
+      expect(transport.scheduled, isNotEmpty);
+
+      await scheduler.setNotificationsMasterEnabled(false);
+      expect(transport.scheduled, isEmpty);
+
+      // The reminder row itself is untouched - only the platform
+      // notification is suppressed.
+      final persisted = await reminderRepository.getReminder(reminder.id!);
+      expect(persisted, isNotNull);
+      expect(persisted!.isEnabled, isTrue);
+
+      // A brand new reminder also does not reach the platform while off.
+      final another = await scheduler.createAndScheduleReminder(
+        taskId: task.id!,
+        reminderTime: DateTime(2026, 9, 21, 9, 0),
+      );
+      expect(transport.scheduled.containsKey(another.id), isFalse);
+    });
+
+    test('turning the master switch back on re-schedules what should be active', () async {
+      final task = await taskRepository.createTask(title: 'Water the plants');
+      final reminder = await scheduler.createAndScheduleReminder(
+        taskId: task.id!,
+        reminderTime: DateTime(2026, 9, 20, 9, 0),
+      );
+
+      await scheduler.setNotificationsMasterEnabled(false);
+      expect(transport.scheduled, isEmpty);
+
+      await scheduler.setNotificationsMasterEnabled(true);
+      expect(transport.scheduled.containsKey(reminder.id), isTrue);
+    });
+
+    test('default snooze option defaults to 10 minutes and is used by the notification Snooze action', () async {
+      await scheduler.initialize();
+      expect(await scheduler.defaultSnoozeOption(), SnoozeOption.tenMinutes);
+
+      final task = await taskRepository.createTask(title: 'Water the plants');
+      final reminder = await scheduler.createAndScheduleReminder(
+        taskId: task.id!,
+        reminderTime: DateTime(2026, 9, 20, 9, 0),
+      );
+
+      await transport.simulateInteraction(
+        NotificationInteraction(notificationId: reminder.id!, actionId: NotificationActionIds.snooze),
+      );
+
+      final snoozed = await reminderRepository.getReminder(reminder.id!);
+      expect(snoozed?.snoozeMinutes, 10);
+    });
+
+    test('changing the default snooze option changes what the notification Snooze action applies', () async {
+      await scheduler.initialize();
+      await scheduler.setDefaultSnoozeOption(SnoozeOption.thirtyMinutes);
+
+      final task = await taskRepository.createTask(title: 'Water the plants');
+      final reminder = await scheduler.createAndScheduleReminder(
+        taskId: task.id!,
+        reminderTime: DateTime(2026, 9, 20, 9, 0),
+      );
+
+      await transport.simulateInteraction(
+        NotificationInteraction(notificationId: reminder.id!, actionId: NotificationActionIds.snooze),
+      );
+
+      final snoozed = await reminderRepository.getReminder(reminder.id!);
+      expect(snoozed?.snoozeMinutes, 30);
     });
   });
 }

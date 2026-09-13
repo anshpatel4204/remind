@@ -346,6 +346,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.chevron_left),
+                      tooltip: 'Previous',
                       onPressed: () => _changeHeader(-1),
                     ),
                     Expanded(
@@ -357,6 +358,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     ),
                     IconButton(
                       icon: const Icon(Icons.chevron_right),
+                      tooltip: 'Next',
                       onPressed: () => _changeHeader(1),
                     ),
                   ],

@@ -102,6 +102,12 @@ abstract class NotificationTransport {
   /// untouched - REmind uses it to carry the reminder's database id.
   /// [exact] false requests inexact (battery-friendlier, OS-batched)
   /// timing instead, used when [canScheduleExactNotifications] is false.
+  /// [soundEnabled]/[vibrationEnabled] reflect the user's in-app
+  /// Notifications settings (see [NotificationScheduler]) - Android fixes
+  /// a notification channel's sound/vibration the first time that channel
+  /// is created, so a real implementation needs one channel per
+  /// combination rather than a single mutable channel (see
+  /// [NotificationService] for how).
   Future<void> schedule({
     required int id,
     required String title,
@@ -110,6 +116,8 @@ abstract class NotificationTransport {
     required List<NotificationAction> actions,
     String? payload,
     bool exact = true,
+    bool soundEnabled = true,
+    bool vibrationEnabled = true,
   });
 
   /// Cancels a scheduled or currently-showing notification. Safe to call
@@ -155,6 +163,8 @@ class NoopNotificationTransport implements NotificationTransport {
     required List<NotificationAction> actions,
     String? payload,
     bool exact = true,
+    bool soundEnabled = true,
+    bool vibrationEnabled = true,
   }) async {}
 
   @override
