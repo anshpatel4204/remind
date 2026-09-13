@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/constants/category_colors.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/color_utils.dart';
+import '../../../../core/utils/statistics_calculator.dart';
 import '../../../../data/models/category_model.dart';
 import '../../../../data/models/enums.dart';
 import '../../../../presentation/widgets/remind_bar_chart.dart';
@@ -17,7 +19,9 @@ import '../../../../presentation/widgets/repository_scope.dart';
 /// The Statistics tab: simple counts and breakdowns computed client-side
 /// from [TaskRepository.getAllTasks] - no new repository methods, and no
 /// charting package dependency, just custom bar/progress widgets built out
-/// of plain [Container]s and [LinearProgressIndicator].
+/// of plain [Container]s and [LinearProgressIndicator]. The actual number
+/// crunching lives in [StatisticsCalculator], kept separate so it can be
+/// unit tested without a database or a widget tree.
 class StatisticsScreen extends StatefulWidget {
   const StatisticsScreen({super.key});
 
@@ -25,8 +29,19 @@ class StatisticsScreen extends StatefulWidget {
   State<StatisticsScreen> createState() => _StatisticsScreenState();
 }
 
+/// Bundles the pure [StatisticsData] with the category lookup table the
+/// screen needs to render category names/colors - the latter is a display
+/// concern (fetching category rows), not part of the calculation itself,
+/// so it stays out of [StatisticsCalculator].
+class _ScreenStats {
+  const _ScreenStats({required this.data, required this.categoryById});
+
+  final StatisticsData data;
+  final Map<int, CategoryModel> categoryById;
+}
+
 class _StatisticsScreenState extends State<StatisticsScreen> {
-  late Future<_StatsData> _future;
+  late Future<_ScreenStats> _future;
   bool _initialized = false;
 
   @override
@@ -38,60 +53,14 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     }
   }
 
-  Future<_StatsData> _load() async {
+  Future<_ScreenStats> _load() async {
     final repos = RepositoryScope.of(context);
     final tasks = await repos.taskRepository.getAllTasks();
     final categories = await repos.categoryRepository.getAllCategories();
-    final now = DateTime.now();
 
-    var completed = 0;
-    var cancelled = 0;
-    var overdue = 0;
-    var pending = 0;
-
-    final byPriority = <TaskPriority, int>{for (final p in TaskPriority.values) p: 0};
-    final byCategory = <int?, int>{};
-
-    // Monday-start week containing `now`, for the "Tasks Completed" chart -
-    // real completedAt data, not a fabricated trend.
-    final weekStart = DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1));
-    final weekEnd = weekStart.add(const Duration(days: 7));
-    final completedByWeekday = List<int>.filled(7, 0);
-
-    for (final task in tasks) {
-      final isOverdue = task.dueDate != null &&
-          task.dueDate!.isBefore(now) &&
-          task.status != TaskStatus.completed &&
-          task.status != TaskStatus.cancelled;
-
-      if (task.status == TaskStatus.completed) {
-        completed++;
-        final completedAt = task.completedAt;
-        if (completedAt != null && !completedAt.isBefore(weekStart) && completedAt.isBefore(weekEnd)) {
-          completedByWeekday[completedAt.weekday - 1]++;
-        }
-      } else if (task.status == TaskStatus.cancelled) {
-        cancelled++;
-      } else if (isOverdue) {
-        overdue++;
-      } else {
-        pending++;
-      }
-
-      byPriority[task.priority] = (byPriority[task.priority] ?? 0) + 1;
-      byCategory[task.categoryId] = (byCategory[task.categoryId] ?? 0) + 1;
-    }
-
-    return _StatsData(
-      total: tasks.length,
-      completed: completed,
-      pending: pending,
-      overdue: overdue,
-      cancelled: cancelled,
-      byPriority: byPriority,
-      byCategory: byCategory,
+    return _ScreenStats(
+      data: StatisticsCalculator.compute(tasks, now: DateTime.now()),
       categoryById: {for (final c in categories) if (c.id != null) c.id!: c},
-      completedByWeekday: completedByWeekday,
     );
   }
 
@@ -105,7 +74,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Statistics')),
-      body: FutureBuilder<_StatsData>(
+      body: FutureBuilder<_ScreenStats>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
@@ -117,7 +86,9 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
           if (snapshot.connectionState != ConnectionState.done) {
             return const REmindLoadingState();
           }
-          final data = snapshot.data!;
+          final screenStats = snapshot.data!;
+          final data = screenStats.data;
+          final categoryById = screenStats.categoryById;
           if (data.total == 0) {
             return const REmindEmptyState(
               icon: Icons.bar_chart_outlined,
@@ -125,7 +96,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               message: 'Add some tasks to see your stats here.',
             );
           }
-          final completionRate = data.completed / data.total;
 
           return RefreshIndicator(
             onRefresh: () async => _reload(),
@@ -164,6 +134,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       count: data.overdue,
                       color: Theme.of(context).colorScheme.error,
                     ),
+                    REmindStatCard(
+                      icon: Icons.event_busy_outlined,
+                      label: 'Missed',
+                      count: data.missed,
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 24),
@@ -175,7 +151,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: LinearProgressIndicator(
-                          value: completionRate,
+                          value: data.completionRate,
                           minHeight: 10,
                           backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                           valueColor: const AlwaysStoppedAnimation(Colors.green),
@@ -183,12 +159,42 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Text('${(completionRate * 100).round()}%'),
+                    Text('${(data.completionRate * 100).round()}%'),
+                  ],
+                ),
+                const SizedBox(height: 28),
+                const REmindSectionHeader(title: 'Completed', icon: Icons.event_available_outlined),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: REmindStatCard(
+                        label: 'Today',
+                        count: data.completedToday,
+                        color: Colors.green,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: REmindStatCard(
+                        label: 'This week',
+                        count: data.completedThisWeek,
+                        color: Colors.green,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: REmindStatCard(
+                        label: 'This month',
+                        count: data.completedThisMonth,
+                        color: Colors.green,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 28),
                 const REmindSectionHeader(
-                  title: 'Tasks Completed',
+                  title: 'Tasks completed per day',
                   icon: Icons.stacked_bar_chart_outlined,
                 ),
                 const SizedBox(height: 12),
@@ -199,8 +205,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                       values: [
                         for (var i = 0; i < 7; i++)
                           BarValue(
-                            label: const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i],
-                            value: data.completedByWeekday[i],
+                            label: i == 6
+                                ? 'Today'
+                                : DateFormat('E').format(data.chartStart.add(Duration(days: i))),
+                            value: data.completedPerDay[i],
                           ),
                       ],
                     ),
@@ -222,12 +230,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                               DonutSegment(
                                 label: entry.key == null
                                     ? 'Uncategorized'
-                                    : (data.categoryById[entry.key]?.name ?? 'Unknown'),
+                                    : (categoryById[entry.key]?.name ?? 'Unknown'),
                                 value: entry.value,
                                 color: entry.key == null
                                     ? Theme.of(context).colorScheme.outline
-                                    : (colorFromHex(data.categoryById[entry.key]?.color) ??
-                                        kDefaultCategoryColors[data.categoryById[entry.key]?.name] ??
+                                    : (colorFromHex(categoryById[entry.key]?.color) ??
+                                        kDefaultCategoryColors[categoryById[entry.key]?.name] ??
                                         Theme.of(context).colorScheme.primary),
                               ),
                           ],
@@ -250,8 +258,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                                           shape: BoxShape.circle,
                                           color: entry.key == null
                                               ? Theme.of(context).colorScheme.outline
-                                              : (colorFromHex(data.categoryById[entry.key]?.color) ??
-                                                  kDefaultCategoryColors[data.categoryById[entry.key]?.name] ??
+                                              : (colorFromHex(categoryById[entry.key]?.color) ??
+                                                  kDefaultCategoryColors[categoryById[entry.key]?.name] ??
                                                   Theme.of(context).colorScheme.primary),
                                         ),
                                       ),
@@ -260,7 +268,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                                         child: Text(
                                           entry.key == null
                                               ? 'Uncategorized'
-                                              : (data.categoryById[entry.key]?.name ?? 'Unknown'),
+                                              : (categoryById[entry.key]?.name ?? 'Unknown'),
                                           overflow: TextOverflow.ellipsis,
                                           style: Theme.of(context).textTheme.bodySmall,
                                         ),
@@ -297,39 +305,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     );
   }
 }
-
-class _StatsData {
-  const _StatsData({
-    required this.total,
-    required this.completed,
-    required this.pending,
-    required this.overdue,
-    required this.cancelled,
-    required this.byPriority,
-    required this.byCategory,
-    required this.categoryById,
-    required this.completedByWeekday,
-  });
-
-  final int total;
-  final int completed;
-  final int pending;
-  final int overdue;
-  final int cancelled;
-  final Map<TaskPriority, int> byPriority;
-  final Map<int?, int> byCategory;
-  final Map<int, CategoryModel> categoryById;
-
-  /// Completed-task counts for the current week, Monday first - real data
-  /// from each task's `completedAt`, used by the "Tasks Completed" chart.
-  final List<int> completedByWeekday;
-
-  List<MapEntry<int?, int>> sortedCategoryCounts() {
-    final entries = byCategory.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-    return entries;
-  }
-}
-
 
 class _BreakdownRow extends StatelessWidget {
   const _BreakdownRow({

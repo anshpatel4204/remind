@@ -128,6 +128,60 @@ FROM tasks_old_v1
     await batch.commit(noResult: true);
   }
 
+  /// Deletes every row from every table this app owns, then inserts the
+  /// rows supplied for each - all inside a single transaction, so a
+  /// restore either fully replaces the database or (on any failure, e.g.
+  /// a constraint violation in a corrupted-but-somehow-still-parsed
+  /// backup) leaves it completely untouched rather than half-wiped.
+  ///
+  /// Insert order matters: children are inserted after the parents their
+  /// foreign keys point at (categories/tags/recurrence_rules, then tasks,
+  /// then task_tags/reminders), matching dependency order in the schema
+  /// (see [SchemaV3]) so `PRAGMA foreign_keys = ON` never rejects a row.
+  /// Deletion runs in the opposite order for the same reason.
+  Future<void> replaceAllData({
+    required List<Map<String, Object?>> categories,
+    required List<Map<String, Object?>> tags,
+    required List<Map<String, Object?>> recurrenceRules,
+    required List<Map<String, Object?>> tasks,
+    required List<Map<String, Object?>> taskTags,
+    required List<Map<String, Object?>> reminders,
+    required List<Map<String, Object?>> settings,
+  }) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete(RemindersTable.name);
+      await txn.delete(TaskTagsTable.name);
+      await txn.delete(TasksTable.name);
+      await txn.delete(RecurrenceRulesTable.name);
+      await txn.delete(CategoriesTable.name);
+      await txn.delete(TagsTable.name);
+      await txn.delete(SettingsTable.name);
+
+      for (final row in categories) {
+        await txn.insert(CategoriesTable.name, row);
+      }
+      for (final row in tags) {
+        await txn.insert(TagsTable.name, row);
+      }
+      for (final row in recurrenceRules) {
+        await txn.insert(RecurrenceRulesTable.name, row);
+      }
+      for (final row in tasks) {
+        await txn.insert(TasksTable.name, row);
+      }
+      for (final row in taskTags) {
+        await txn.insert(TaskTagsTable.name, row, conflictAlgorithm: ConflictAlgorithm.ignore);
+      }
+      for (final row in reminders) {
+        await txn.insert(RemindersTable.name, row);
+      }
+      for (final row in settings) {
+        await txn.insert(SettingsTable.name, row);
+      }
+    });
+  }
+
   Future<void> close() async {
     final db = _database;
     if (db != null) {

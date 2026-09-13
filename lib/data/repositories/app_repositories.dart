@@ -9,6 +9,7 @@ import '../datasources/settings_data_source.dart';
 import '../datasources/tag_data_source.dart';
 import '../datasources/task_data_source.dart';
 import '../datasources/task_tag_data_source.dart';
+import 'backup_repository.dart';
 import 'category_repository.dart';
 import 'recurrence_repository.dart';
 import 'reminder_repository.dart';
@@ -58,6 +59,7 @@ class AppRepositories {
         reminderRepository: reminderRepository,
         reminderEngine: reminderEngine,
       ),
+      backupRepository: BackupRepository(db),
     );
   }
 
@@ -70,6 +72,7 @@ class AppRepositories {
     required this.recurrenceRepository,
     required this.reminderEngine,
     required this.notificationScheduler,
+    required this.backupRepository,
   });
 
   final TaskRepository taskRepository;
@@ -91,4 +94,9 @@ class AppRepositories {
   /// creates, changes, or removes a reminder, so a reminder row is never
   /// left without a matching scheduled notification, or vice versa.
   final NotificationScheduler notificationScheduler;
+
+  /// Local JSON export/import for the whole database (Part 10's Backup
+  /// and Restore) - see [BackupRepository] itself for the full format and
+  /// validation rules.
+  final BackupRepository backupRepository;
 }
