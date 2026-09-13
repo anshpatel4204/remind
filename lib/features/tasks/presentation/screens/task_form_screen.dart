@@ -238,6 +238,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         ],
       ),
     );
+    controller.dispose();
     if (name != null && name.trim().isNotEmpty) {
       await _addNewTag(name);
     }

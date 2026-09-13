@@ -10,24 +10,6 @@ class TaskTagDataSource {
 
   final AppDatabase _appDatabase;
 
-  Future<void> addTag(int taskId, int tagId) async {
-    final Database db = await _appDatabase.database;
-    await db.insert(
-      TaskTagsTable.name,
-      {TaskTagsTable.taskId: taskId, TaskTagsTable.tagId: tagId},
-      conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
-  }
-
-  Future<void> removeTag(int taskId, int tagId) async {
-    final Database db = await _appDatabase.database;
-    await db.delete(
-      TaskTagsTable.name,
-      where: '${TaskTagsTable.taskId} = ? AND ${TaskTagsTable.tagId} = ?',
-      whereArgs: [taskId, tagId],
-    );
-  }
-
   /// Replaces the full set of tags assigned to [taskId] with [tagIds], in a
   /// single transaction so partial updates are never visible.
   Future<void> replaceTagsForTask(int taskId, List<int> tagIds) async {

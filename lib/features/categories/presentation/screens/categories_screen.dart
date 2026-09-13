@@ -115,8 +115,12 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       ),
     );
 
-    if (result != true) return;
+    if (result != true) {
+      controller.dispose();
+      return;
+    }
     final name = controller.text.trim();
+    controller.dispose();
     if (!mounted) return;
     final repos = RepositoryScope.of(context);
     if (existing == null) {

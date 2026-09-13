@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/utils/date_formatting.dart';
 import '../../../../data/models/category_model.dart';
 import '../../../../data/models/enums.dart';
 import '../../../../data/models/reminder_model.dart';
@@ -18,7 +19,6 @@ final DateFormat _monthFormat = DateFormat('MMMM yyyy');
 final DateFormat _dayHeaderFormat = DateFormat('EEEE, MMM d');
 final DateFormat _weekEndpointFormat = DateFormat('MMM d');
 final DateFormat _weekEndpointFormatWithYear = DateFormat('MMM d, yyyy');
-final DateFormat _timeFormat = DateFormat('h:mm a');
 const List<String> _weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 /// Which range the Calendar tab is currently showing.
@@ -401,7 +401,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                   dense: true,
                                   leading: const Icon(Icons.notifications_outlined),
                                   title: Text(task.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                                  trailing: Text(_timeFormat.format(reminder.reminderTime)),
+                                  trailing: Text(formatTime(reminder.reminderTime)),
                                   onTap: () => _openDetails(task),
                                 ),
                               ),

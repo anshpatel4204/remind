@@ -72,8 +72,12 @@ class _TagsScreenState extends State<TagsScreen> {
       ),
     );
 
-    if (result != true) return;
+    if (result != true) {
+      controller.dispose();
+      return;
+    }
     final name = controller.text.trim();
+    controller.dispose();
     if (!mounted) return;
     final repos = RepositoryScope.of(context);
     if (existing == null) {
