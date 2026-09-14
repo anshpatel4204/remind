@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/theme/user_preferences_controller.dart';
 import '../../../../core/utils/date_formatting.dart';
 import '../../../../core/utils/recurrence_text.dart';
 import '../../../../data/models/category_model.dart';
@@ -36,10 +37,14 @@ enum _CalendarViewMode { day, week, month }
 
 DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
-/// The Monday that starts the week containing [d].
-DateTime _startOfWeek(DateTime d) {
+/// The day that starts the week containing [d] - Monday by default, or
+/// [firstWeekday] (DateTime.monday/.sunday) when the caller has resolved
+/// the user's First day of week preference (Part 13; see
+/// UserPreferencesController.resolveFirstDayOfWeek).
+DateTime _startOfWeek(DateTime d, {int firstWeekday = DateTime.monday}) {
   final day = _dateOnly(d);
-  return day.subtract(Duration(days: day.weekday - 1));
+  final offset = (day.weekday - firstWeekday) % 7;
+  return day.subtract(Duration(days: offset));
 }
 
 /// The Calendar tab: Day/Week/Month views (no calendar package - the
@@ -76,6 +81,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
     super.didChangeDependencies();
     if (!_initialized) {
       _initialized = true;
+      // initState() ran before UserPreferencesScope was readable, so
+      // _visibleWeekStart started at the Monday-based default; correct it
+      // here, once, now that the user's actual preference is available.
+      _visibleWeekStart = _startOfWeek(DateTime.now(),
+          firstWeekday: UserPreferencesScope.of(context).resolveFirstDayOfWeek());
       _future = _load();
     }
   }
@@ -170,7 +180,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
         case _CalendarViewMode.month:
           _visibleMonth = DateTime(anchor.year, anchor.month);
         case _CalendarViewMode.week:
-          _visibleWeekStart = _startOfWeek(anchor);
+          _visibleWeekStart = _startOfWeek(anchor,
+              firstWeekday: UserPreferencesScope.of(context).resolveFirstDayOfWeek());
         case _CalendarViewMode.day:
           _selectedDay = anchor;
       }
@@ -213,9 +224,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   void _jumpToToday() {
     final now = DateTime.now();
+    final firstWeekday = UserPreferencesScope.of(context).resolveFirstDayOfWeek();
     setState(() {
       _visibleMonth = DateTime(now.year, now.month);
-      _visibleWeekStart = _startOfWeek(now);
+      _visibleWeekStart = _startOfWeek(now, firstWeekday: firstWeekday);
       _selectedDay = _dateOnly(now);
       _future = _load();
     });
@@ -299,6 +311,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final userPreferences = UserPreferencesScope.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Calendar'),
@@ -383,7 +396,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 ),
               ),
               if (_viewMode != _CalendarViewMode.day) ...[
-                const _WeekdayHeader(),
+                _WeekdayHeader(
+                  startOnSunday: _viewMode == _CalendarViewMode.week &&
+                      userPreferences.firstDayOfWeek ==
+                          FirstDayOfWeekPreference.sunday,
+                ),
                 if (_viewMode == _CalendarViewMode.month)
                   _MonthGrid(
                     visibleMonth: _visibleMonth,
@@ -423,8 +440,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                   title: Text(task.title,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis),
-                                  trailing:
-                                      Text(formatTime(reminder.reminderTime)),
+                                  trailing: Text(formatTime(
+                                    reminder.reminderTime,
+                                    use24Hour: UserPreferencesScope.of(context)
+                                        .resolveUse24Hour(context),
+                                  )),
                                   onTap: () => _openDetails(task),
                                 ),
                               ),
@@ -493,15 +513,20 @@ class _CalendarData {
 }
 
 class _WeekdayHeader extends StatelessWidget {
-  const _WeekdayHeader();
+  const _WeekdayHeader({this.startOnSunday = false});
+
+  final bool startOnSunday;
 
   @override
   Widget build(BuildContext context) {
+    final labels = startOnSunday
+        ? [_weekdayLabels.last, ..._weekdayLabels.take(6)]
+        : _weekdayLabels;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: Row(
         children: [
-          for (final label in _weekdayLabels)
+          for (final label in labels)
             Expanded(
               child: Center(
                 child: Text(

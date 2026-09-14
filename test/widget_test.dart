@@ -78,6 +78,26 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
   }
 
+  // SplashScreen's own 900ms minimum-display Future.delayed is created by
+  // app code during pumpWidget()/pump() - not inside a tester.runAsync()
+  // block - so it runs on the test's FAKE clock, same as any Future.delayed
+  // the app itself schedules. pumpUntilFound's loop only ever issues
+  // zero-duration pump() calls, which never advance that fake clock, so it
+  // alone can never make that 900ms timer fire. Meanwhile the *other* half
+  // of what SplashScreen awaits - the (Noop) notification bootstrap and its
+  // real cross-isolate settings read - needs actual wall-clock time to
+  // resolve, same as every other real-database wait in this file.
+  // Interleaving a real runAsync() delay with a pump(Duration) each
+  // iteration satisfies both at once, the same pattern already used below
+  // for sqflite_common's own internal lock-diagnostic Timer.
+  Future<void> waitForSplashToFinish(WidgetTester tester) async {
+    for (var i = 0; i < 12; i++) {
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+  }
+
   testWidgets('REmind shell shows all five navigation destinations',
       (WidgetTester tester) async {
     await tester.pumpWidget(RemindApp(repositories: repositories));
@@ -264,5 +284,64 @@ void main() {
 
     expect(find.textContaining('No results for "nothing matches this"'),
         findsOneWidget);
+  });
+
+  group('AppBootGate (Part 13 splash/onboarding)', () {
+    testWidgets(
+        'shows the branded splash, then transitions to Onboarding for a '
+        'fresh install', (WidgetTester tester) async {
+      await tester.pumpWidget(AppBootGate(repositories: repositories));
+      await tester.pump();
+
+      // Splash is up first - its own minimum display duration (900ms)
+      // plus the (Noop) notification bootstrap haven't resolved yet.
+      expect(find.text('Skip'), findsNothing);
+
+      await waitForSplashToFinish(tester);
+      await pumpUntilFound(tester, find.text('Skip'));
+
+      expect(find.text('Skip'), findsOneWidget);
+      expect(find.text('Never Miss What Matters'), findsOneWidget);
+    });
+
+    testWidgets(
+        'tapping Skip completes onboarding and shows the main shell',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(AppBootGate(repositories: repositories));
+      await tester.pump();
+
+      await waitForSplashToFinish(tester);
+      await pumpUntilFound(tester, find.text('Skip'));
+      await tester.tap(find.text('Skip'));
+
+      await pumpUntilFound(tester, find.text('Home'), maxAttempts: 30);
+      expect(find.text('Home'), findsOneWidget);
+
+      expect(
+          await repositories.settingsRepository.getOnboardingCompleted(),
+          isTrue);
+
+      // Let the main shell's backgrounded Settings tab (see the 'Tapping
+      // Tasks' test above for why) finish its own load chain before
+      // tearDown() closes the database out from under it.
+      await pumpUntilFound(tester, find.text('Appearance'));
+    });
+
+    testWidgets(
+        'a database with onboarding already completed goes straight from '
+        'splash to the main shell', (WidgetTester tester) async {
+      await repositories.settingsRepository.setOnboardingCompleted(true);
+
+      await tester.pumpWidget(AppBootGate(repositories: repositories));
+      await tester.pump();
+
+      await waitForSplashToFinish(tester);
+      await pumpUntilFound(tester, find.text('Home'));
+
+      expect(find.text('Home'), findsOneWidget);
+      expect(find.text('Skip'), findsNothing);
+
+      await pumpUntilFound(tester, find.text('Appearance'));
+    });
   });
 }

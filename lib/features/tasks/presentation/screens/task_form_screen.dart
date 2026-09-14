@@ -49,6 +49,13 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   TimeOfDay? _reminderTime;
   ReminderModel? _existingReminder;
 
+  /// The user's Settings > Tasks > Default reminder time (Part 13),
+  /// applied whenever neither an existing reminder time nor the task's
+  /// own due time is available. Starts at 9:00 AM - REmind's original
+  /// hardcoded fallback - so nothing changes before [_loadFormData]'s
+  /// real value loads.
+  TimeOfDay _defaultReminderTime = const TimeOfDay(hour: 9, minute: 0);
+
   /// Null means "does not repeat". See [RecurrenceDraft] for why this is
   /// kept separate from a real [RecurrenceRuleModel] until the form is
   /// actually saved.
@@ -150,6 +157,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       defaultPriority = await repos.settingsRepository.getDefaultTaskPriority();
       defaultCategoryId = await repos.settingsRepository.getDefaultCategoryId();
     }
+    final defaultReminderMinutes =
+        await repos.settingsRepository.getDefaultReminderTimeMinutes();
 
     if (!mounted) return;
     setState(() {
@@ -169,6 +178,10 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       if (_categoryId != null && !categories.any((c) => c.id == _categoryId)) {
         _categoryId = null;
       }
+      _defaultReminderTime = TimeOfDay(
+        hour: defaultReminderMinutes ~/ 60,
+        minute: defaultReminderMinutes % 60,
+      );
       _existingReminder = existingReminder;
       _recurrenceDraft = recurrenceDraft;
       _loadedRecurrenceRule = loadedRule;
@@ -197,7 +210,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
 
   DateTime? get _combinedReminderDateTime {
     if (_reminderDate == null) return null;
-    final time = _reminderTime ?? const TimeOfDay(hour: 9, minute: 0);
+    final time = _reminderTime ?? _defaultReminderTime;
     return DateTime(
       _reminderDate!.year,
       _reminderDate!.month,
@@ -236,8 +249,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   Future<void> _pickReminderTime() async {
     final picked = await showTimePicker(
       context: context,
-      initialTime:
-          _reminderTime ?? _dueTime ?? const TimeOfDay(hour: 9, minute: 0),
+      initialTime: _reminderTime ?? _dueTime ?? _defaultReminderTime,
     );
     if (picked != null) setState(() => _reminderTime = picked);
   }
@@ -673,8 +685,7 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                 _reminderEnabled = value;
                 if (value) {
                   _reminderDate ??= _dueDate ?? DateTime.now();
-                  _reminderTime ??=
-                      _dueTime ?? const TimeOfDay(hour: 9, minute: 0);
+                  _reminderTime ??= _dueTime ?? _defaultReminderTime;
                 }
               }),
             ),

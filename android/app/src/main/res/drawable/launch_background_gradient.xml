@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Part 13: mirrors SplashScreen's LinearGradient(topLeft -> bottomRight,
+     AppColors.splashGradientStart -> splashGradientEnd). Android's shape
+     gradient angle is measured counterclockwise from the positive x-axis,
+     so 315 degrees is the top-left-to-bottom-right diagonal Flutter's
+     Alignment.topLeft -> Alignment.bottomRight also describes. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:startColor="@color/splash_gradient_start"
+        android:endColor="@color/splash_gradient_end"
+        android:angle="315"/>
+</shape>

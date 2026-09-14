@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/category_colors.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/color_utils.dart';
+import '../../../../core/theme/user_preferences_controller.dart';
 import '../../../../core/utils/date_formatting.dart';
 import '../../../../core/utils/task_status_calculator.dart';
 import '../../../../data/models/category_model.dart';
@@ -168,7 +169,11 @@ class TaskListTile extends StatelessWidget {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                formatDateTime(task.dueDate!),
+                                formatDateTime(
+                                  task.dueDate!,
+                                  use24Hour: UserPreferencesScope.of(context)
+                                      .resolveUse24Hour(context),
+                                ),
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
                             ],

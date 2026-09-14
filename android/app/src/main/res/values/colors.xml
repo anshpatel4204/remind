@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Sampled from the REmind logo's background gradient. -->
-    <color name="launch_background_color">#0B1240</color>
+    <!-- Matches AppColors.splashGradientStart/splashGradientEnd
+         (lib/core/theme/app_colors.dart) - the native launch background
+         (shown before the Flutter engine takes over) mirrors the same
+         gradient SplashScreen renders, so there's no color jump between
+         the two (Part 13). -->
+    <color name="splash_gradient_start">#FFEDEBFB</color>
+    <color name="splash_gradient_end">#FFE3F0FF</color>
 </resources>

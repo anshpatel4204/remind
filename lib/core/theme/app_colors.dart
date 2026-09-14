@@ -28,6 +28,13 @@ class AppColors {
   static const Color brandPurple = Color(0xFF534BF5);
   static const Color brandPurpleLight = Color(0xFF706CEF);
 
+  // Splash screen gradient (Part 13) - light, theme-independent (Splash
+  // always uses this exact look regardless of the user's light/dark
+  // preference, matching the design reference), so these are kept
+  // separate from the light/dark surface tokens above.
+  static const Color splashGradientStart = Color(0xFFEDEBFB);
+  static const Color splashGradientEnd = Color(0xFFE3F0FF);
+
   // Light-mode surfaces & text.
   static const Color background = Color(0xFFFCFCFD);
   static const Color surface = Color(0xFFF3F5FB);

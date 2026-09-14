@@ -142,3 +142,60 @@ enum OccurrenceExceptionStatus {
   static OccurrenceExceptionStatus fromDbValue(int value) =>
       OccurrenceExceptionStatus.values[value];
 }
+
+/// The user's preferred clock format for every time REmind displays,
+/// stored as a plain string setting (`name`) in the `settings` key/value
+/// table - unlike the enums above, this is never a SQLite table column,
+/// so there's no `dbValue`/`fromDbValue` integer pair to keep stable
+/// across releases.
+enum TimeFormatPreference {
+  /// Follow the device's own 12/24-hour setting (`MediaQuery`'s
+  /// `alwaysUse24HourFormat`). The default for every user until they
+  /// explicitly choose otherwise.
+  system,
+  h12,
+  h24;
+
+  static TimeFormatPreference fromName(String? name) {
+    return TimeFormatPreference.values
+        .firstWhere((v) => v.name == name, orElse: () => system);
+  }
+}
+
+/// Which weekday REmind's Calendar week view starts on, stored as a plain
+/// string setting (see [TimeFormatPreference]'s doc comment for why this
+/// isn't a table-column enum).
+enum FirstDayOfWeekPreference {
+  /// Monday for most locales; REmind has no per-locale first-day table,
+  /// so "system" currently resolves to Monday, matching REmind's existing
+  /// (pre-Part-13) Calendar/Statistics behavior exactly until a user
+  /// picks something else.
+  system,
+  monday,
+  sunday;
+
+  static FirstDayOfWeekPreference fromName(String? name) {
+    return FirstDayOfWeekPreference.values
+        .firstWhere((v) => v.name == name, orElse: () => system);
+  }
+}
+
+/// App-wide text scale preference (an accessibility setting), stored as a
+/// plain string setting (see [TimeFormatPreference]'s doc comment).
+/// Applied via a `MediaQuery` override wrapping the whole app rather than
+/// per-widget, so every screen scales consistently.
+enum TextScalePreference {
+  small(0.85),
+  standard(1.0),
+  large(1.15),
+  extraLarge(1.3);
+
+  const TextScalePreference(this.scaleFactor);
+
+  final double scaleFactor;
+
+  static TextScalePreference fromName(String? name) {
+    return TextScalePreference.values
+        .firstWhere((v) => v.name == name, orElse: () => standard);
+  }
+}

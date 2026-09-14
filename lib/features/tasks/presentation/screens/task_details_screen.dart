@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/constants/category_colors.dart';
 import '../../../../core/utils/color_utils.dart';
+import '../../../../core/theme/user_preferences_controller.dart';
 import '../../../../core/utils/date_formatting.dart';
 import '../../../../core/utils/recurrence_text.dart';
 import '../../../../core/utils/task_status_calculator.dart';
@@ -334,7 +335,11 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         const SizedBox(height: 4),
         Text(task.dueDate == null
             ? 'No due date set'
-            : formatDateTime(task.dueDate!)),
+            : formatDateTime(
+                task.dueDate!,
+                use24Hour:
+                    UserPreferencesScope.of(context).resolveUse24Hour(context),
+              )),
         const SizedBox(height: 20),
         if (data.recurrenceRule != null) ...[
           Text('Repeats', style: Theme.of(context).textTheme.labelLarge),
@@ -372,7 +377,8 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
         const SizedBox(height: 20),
         Text('Reminder', style: Theme.of(context).textTheme.labelLarge),
         const SizedBox(height: 4),
-        Text(_reminderInfoText(reminder)),
+        Text(_reminderInfoText(reminder,
+            UserPreferencesScope.of(context).resolveUse24Hour(context))),
         const SizedBox(height: 28),
         Wrap(
           spacing: 8,
@@ -432,13 +438,14 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     );
   }
 
-  String _reminderInfoText(ReminderModel? reminder) {
+  String _reminderInfoText(ReminderModel? reminder, bool use24Hour) {
     if (reminder == null) return 'No reminder set';
     if (reminder.snoozedUntil != null &&
         reminder.snoozedUntil!.isAfter(DateTime.now())) {
-      return 'Snoozed until ${formatDateTime(reminder.snoozedUntil!)}';
+      return 'Snoozed until ${formatDateTime(reminder.snoozedUntil!, use24Hour: use24Hour)}';
     }
-    final base = 'Reminder set for ${formatDateTime(reminder.reminderTime)}';
+    final base =
+        'Reminder set for ${formatDateTime(reminder.reminderTime, use24Hour: use24Hour)}';
     return reminder.isEnabled ? base : '$base (disabled)';
   }
 }

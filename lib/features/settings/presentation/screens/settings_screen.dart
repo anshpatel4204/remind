@@ -5,6 +5,8 @@ import 'package:path/path.dart' as p;
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/theme_controller.dart';
+import '../../../../core/theme/user_preferences_controller.dart';
+import '../../../../core/utils/avatar_utils.dart';
 import '../../../../data/backup/backup_constants.dart';
 import '../../../../data/backup/backup_data.dart';
 import '../../../../data/backup/backup_exception.dart';
@@ -16,9 +18,12 @@ import '../../../../presentation/widgets/remind_section_header.dart';
 import '../../../../presentation/widgets/repository_scope.dart';
 import '../../../../services/backup/backup_file_service.dart';
 import '../../../../services/notification/notification_scheduler.dart';
+import 'profile_edit_screen.dart';
 
-/// The Settings tab: appearance (theme mode), notification preferences,
-/// task defaults, backup/restore, data info, and the About entry.
+/// The Settings tab: profile, appearance (theme/time format/text size),
+/// notification preferences, task defaults, calendar preferences,
+/// privacy, backup/restore, and the About entry - in that order (Part
+/// 13's required 8-section structure).
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -33,6 +38,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
     SnoozeOption.fifteenMinutes: '15 minutes',
     SnoozeOption.thirtyMinutes: '30 minutes',
     SnoozeOption.oneHour: '1 hour',
+  };
+
+  static const Map<TimeFormatPreference, String> _timeFormatLabel = {
+    TimeFormatPreference.system: 'Follow system',
+    TimeFormatPreference.h12: '12-hour (1:30 PM)',
+    TimeFormatPreference.h24: '24-hour (13:30)',
+  };
+
+  static const Map<FirstDayOfWeekPreference, String> _firstDayOfWeekLabel = {
+    FirstDayOfWeekPreference.system: 'Follow system (Monday)',
+    FirstDayOfWeekPreference.monday: 'Monday',
+    FirstDayOfWeekPreference.sunday: 'Sunday',
+  };
+
+  static const Map<TextScalePreference, String> _textScaleLabel = {
+    TextScalePreference.small: 'Small',
+    TextScalePreference.standard: 'Standard',
+    TextScalePreference.large: 'Large',
+    TextScalePreference.extraLarge: 'Extra large',
   };
 
   // Loaded state is kept directly in a nullable field, rather than a
@@ -66,6 +90,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final defaultCategoryId =
         await repos.settingsRepository.getDefaultCategoryId();
     final categories = await repos.categoryRepository.getAllCategories();
+    final defaultReminderTimeMinutes =
+        await repos.settingsRepository.getDefaultReminderTimeMinutes();
     return _SettingsData(
       notificationsEnabled: notificationsEnabled,
       exactAlarmsAllowed: exactAlarmsAllowed,
@@ -76,6 +102,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       defaultPriority: defaultPriority ?? TaskPriority.medium,
       defaultCategoryId: defaultCategoryId,
       categories: categories,
+      defaultReminderTimeMinutes: defaultReminderTimeMinutes,
     );
   }
 
@@ -276,8 +303,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   /// Opens a bottom sheet listing [options], with whichever one matches
   /// [selected] pre-checked, and runs [onSelected] (expected to persist
-  /// the new value and reload this screen's state) when the user taps a
-  /// different one.
+  /// the new value) when the user taps a different one.
   ///
   /// A callback is used here instead of relying on the sheet's return
   /// value on purpose: the Default category picker has a legitimate
@@ -334,15 +360,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Opens Flutter's own time picker pre-filled with [initialMinutes]
+  /// (minutes since midnight) and, if the user confirms a choice, calls
+  /// [onSelected] with the new minutes-since-midnight value. Shared by
+  /// the Default reminder time row - the only plain-`int`-backed time
+  /// setting, so it doesn't fit [_showPicker]'s enum-driven bottom sheet.
+  Future<void> _pickTime({
+    required int initialMinutes,
+    required void Function(int minutes) onSelected,
+  }) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(
+        hour: initialMinutes ~/ 60,
+        minute: initialMinutes % 60,
+      ),
+    );
+    if (picked == null || !mounted) return;
+    onSelected(picked.hour * 60 + picked.minute);
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeController = ThemeControllerScope.of(context);
+    final userPreferences = UserPreferencesScope.of(context);
     final repos = RepositoryScope.of(context);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListenableBuilder(
-        listenable: themeController,
+        listenable: Listenable.merge([themeController, userPreferences]),
         builder: (context, _) {
           final data = _data;
           if (data == null) {
@@ -351,6 +398,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           return ListView(
             children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: REmindSectionHeader(
+                    title: 'Profile', icon: Icons.person_outline),
+              ),
+              ListTile(
+                leading: InitialsAvatar(name: userPreferences.displayName),
+                title: Text(userPreferences.displayName?.isNotEmpty == true
+                    ? userPreferences.displayName!
+                    : 'Add your name'),
+                subtitle: const Text('Optional - stored only on this device'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ProfileEditScreen()),
+                ),
+              ),
+              const Divider(height: 32),
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: REmindSectionHeader(
@@ -375,6 +439,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       value: ThemeMode.dark,
                     ),
                   ],
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.access_time_outlined),
+                title: const Text('Time format'),
+                subtitle: Text(_timeFormatLabel[userPreferences.timeFormat]!),
+                onTap: () => _showPicker<TimeFormatPreference>(
+                  title: 'Time format',
+                  options: [
+                    for (final entry in _timeFormatLabel.entries)
+                      (value: entry.key, label: entry.value),
+                  ],
+                  selected: userPreferences.timeFormat,
+                  onSelected: userPreferences.setTimeFormat,
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.text_fields_outlined),
+                title: const Text('Text size'),
+                subtitle: Text(_textScaleLabel[userPreferences.textScale]!),
+                onTap: () => _showPicker<TextScalePreference>(
+                  title: 'Text size',
+                  options: [
+                    for (final entry in _textScaleLabel.entries)
+                      (value: entry.key, label: entry.value),
+                  ],
+                  selected: userPreferences.textScale,
+                  onSelected: userPreferences.setTextScale,
                 ),
               ),
               const Divider(height: 32),
@@ -533,11 +625,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 ),
               ),
+              ListTile(
+                leading: const Icon(Icons.alarm_add_outlined),
+                title: const Text('Default reminder time'),
+                subtitle: Text(TimeOfDay(
+                  hour: data.defaultReminderTimeMinutes ~/ 60,
+                  minute: data.defaultReminderTimeMinutes % 60,
+                ).format(context)),
+                onTap: () => _pickTime(
+                  initialMinutes: data.defaultReminderTimeMinutes,
+                  onSelected: (minutes) async {
+                    await repos.settingsRepository
+                        .setDefaultReminderTimeMinutes(minutes);
+                    await _reload();
+                  },
+                ),
+              ),
               const Divider(height: 32),
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: REmindSectionHeader(
-                    title: 'Backup', icon: Icons.backup_outlined),
+                    title: 'Calendar', icon: Icons.calendar_month_outlined),
+              ),
+              ListTile(
+                leading: const Icon(Icons.view_week_outlined),
+                title: const Text('First day of week'),
+                subtitle: Text(
+                    _firstDayOfWeekLabel[userPreferences.firstDayOfWeek]!),
+                onTap: () => _showPicker<FirstDayOfWeekPreference>(
+                  title: 'First day of week',
+                  options: [
+                    for (final entry in _firstDayOfWeekLabel.entries)
+                      (value: entry.key, label: entry.value),
+                  ],
+                  selected: userPreferences.firstDayOfWeek,
+                  onSelected: userPreferences.setFirstDayOfWeek,
+                ),
+              ),
+              const Divider(height: 32),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: REmindSectionHeader(
+                    title: 'Privacy', icon: Icons.privacy_tip_outlined),
+              ),
+              const ListTile(
+                leading: Icon(Icons.lock_outline),
+                title: Text('REmind is fully offline'),
+                subtitle: Text(
+                    'All your tasks, reminders, and settings stay only on '
+                    'this device. Nothing is uploaded, tracked, or shared - '
+                    'REmind has no account, no server, and no analytics.'),
+              ),
+              const Divider(height: 32),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: REmindSectionHeader(
+                    title: 'Backup & Restore', icon: Icons.backup_outlined),
               ),
               ListTile(
                 leading: const Icon(Icons.backup_outlined),
@@ -557,7 +700,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: REmindSectionHeader(
-                    title: 'Data', icon: Icons.storage_outlined),
+                    title: 'About', icon: Icons.info_outline),
               ),
               const ListTile(
                 leading: Icon(Icons.info_outline),
@@ -573,12 +716,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 leading: Icon(Icons.description_outlined),
                 title: Text('Backup format version'),
                 subtitle: Text('$kBackupSchemaVersion'),
-              ),
-              const Divider(height: 32),
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: REmindSectionHeader(
-                    title: 'About', icon: Icons.info_outline),
               ),
               ListTile(
                 leading: const Icon(Icons.info_outline),
@@ -598,6 +735,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: const [
                     SizedBox(height: 8),
                     Text(AppConstants.appTagline),
+                    SizedBox(height: 8),
+                    Text(AppConstants.aboutQuote),
                   ],
                 ),
               ),
@@ -628,6 +767,7 @@ class _SettingsData {
     required this.defaultPriority,
     required this.defaultCategoryId,
     required this.categories,
+    required this.defaultReminderTimeMinutes,
   });
 
   final bool notificationsEnabled;
@@ -639,4 +779,5 @@ class _SettingsData {
   final TaskPriority defaultPriority;
   final int? defaultCategoryId;
   final List<CategoryModel> categories;
+  final int defaultReminderTimeMinutes;
 }
