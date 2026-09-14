@@ -1,11 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:remind/data/datasources/occurrence_exception_data_source.dart';
 import 'package:remind/data/datasources/recurrence_rule_data_source.dart';
 import 'package:remind/data/datasources/reminder_data_source.dart';
 import 'package:remind/data/datasources/settings_data_source.dart';
 import 'package:remind/data/datasources/task_data_source.dart';
 import 'package:remind/data/datasources/task_tag_data_source.dart';
 import 'package:remind/data/models/enums.dart';
+import 'package:remind/data/repositories/occurrence_exception_repository.dart';
 import 'package:remind/data/repositories/recurrence_repository.dart';
 import 'package:remind/data/repositories/reminder_repository.dart';
 import 'package:remind/data/repositories/settings_repository.dart';
@@ -24,6 +26,7 @@ void main() {
   late TaskRepository taskRepository;
   late ReminderRepository reminderRepository;
   late RecurrenceRepository recurrenceRepository;
+  late OccurrenceExceptionRepository occurrenceExceptionRepository;
   late ReminderEngine reminderEngine;
   late SettingsRepository settingsRepository;
   late FakeNotificationTransport transport;
@@ -39,10 +42,13 @@ void main() {
         ReminderRepository(ReminderDataSource(testDb.appDatabase));
     recurrenceRepository =
         RecurrenceRepository(RecurrenceRuleDataSource(testDb.appDatabase));
+    occurrenceExceptionRepository = OccurrenceExceptionRepository(
+        OccurrenceExceptionDataSource(testDb.appDatabase));
     reminderEngine = ReminderEngine(
       taskRepository: taskRepository,
       reminderRepository: reminderRepository,
       recurrenceRepository: recurrenceRepository,
+      occurrenceExceptionRepository: occurrenceExceptionRepository,
     );
     settingsRepository =
         SettingsRepository(SettingsDataSource(testDb.appDatabase));
@@ -419,6 +425,114 @@ void main() {
       // separate responsibility (see tasks_screen.dart).
       final persisted = await reminderRepository.getReminder(reminder.id!);
       expect(persisted, isNotNull);
+    });
+
+    test(
+        'skipOccurrence cancels the current notification and reschedules '
+        'the same reminder id for the next occurrence', () async {
+      final rule = await recurrenceRepository.createRule(
+        frequency: RecurrenceFrequency.daily,
+        startDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      final task = await taskRepository.createTask(
+        title: 'Drink water',
+        recurrenceRuleId: rule.id,
+        dueDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      final reminder = await scheduler.createAndScheduleReminder(
+        taskId: task.id!,
+        reminderTime: DateTime(2026, 1, 1, 8, 0),
+      );
+      transport.calls.clear();
+
+      await scheduler.skipOccurrence(task.id!, now: DateTime(2026, 1, 1, 8, 5));
+
+      // Old notification cancelled before the replacement is scheduled -
+      // never both existing at once.
+      expect(transport.calls,
+          ['cancel:${reminder.id}', 'schedule:${reminder.id}']);
+      expect(transport.scheduled[reminder.id]!.scheduledTime,
+          DateTime(2026, 1, 2, 8, 0));
+    });
+
+    test(
+        'skipOccurrence leaves nothing scheduled once the recurrence has '
+        'ended', () async {
+      final rule = await recurrenceRepository.createRule(
+        frequency: RecurrenceFrequency.daily,
+        startDate: DateTime(2026, 1, 1, 8, 0),
+        occurrencesCount: 1,
+      );
+      final task = await taskRepository.createTask(
+        title: 'One-off under the hood',
+        recurrenceRuleId: rule.id,
+        dueDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      final reminder = await scheduler.createAndScheduleReminder(
+        taskId: task.id!,
+        reminderTime: DateTime(2026, 1, 1, 8, 0),
+      );
+
+      await scheduler.skipOccurrence(task.id!, now: DateTime(2026, 1, 1, 8, 5));
+
+      expect(transport.scheduled.containsKey(reminder.id), isFalse);
+    });
+
+    test(
+        'rescheduleOccurrence cancels the current notification and '
+        'schedules the same reminder id at the new time', () async {
+      final rule = await recurrenceRepository.createRule(
+        frequency: RecurrenceFrequency.daily,
+        startDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      final task = await taskRepository.createTask(
+        title: 'Drink water',
+        recurrenceRuleId: rule.id,
+        dueDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      final reminder = await scheduler.createAndScheduleReminder(
+        taskId: task.id!,
+        reminderTime: DateTime(2026, 1, 1, 8, 0),
+      );
+      transport.calls.clear();
+
+      await scheduler.rescheduleOccurrence(
+        task.id!,
+        DateTime(2026, 1, 1, 14, 0),
+        now: DateTime(2026, 1, 1, 8, 0),
+      );
+
+      expect(transport.calls,
+          ['cancel:${reminder.id}', 'schedule:${reminder.id}']);
+      expect(transport.scheduled[reminder.id]!.scheduledTime,
+          DateTime(2026, 1, 1, 14, 0));
+    });
+
+    test('cancelFutureOccurrences does not touch the current notification',
+        () async {
+      final rule = await recurrenceRepository.createRule(
+        frequency: RecurrenceFrequency.daily,
+        startDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      final task = await taskRepository.createTask(
+        title: 'Take medicine',
+        recurrenceRuleId: rule.id,
+        dueDate: DateTime(2026, 1, 5, 8, 0),
+      );
+      final reminder = await scheduler.createAndScheduleReminder(
+        taskId: task.id!,
+        reminderTime: DateTime(2026, 1, 5, 8, 0),
+      );
+      transport.calls.clear();
+
+      await scheduler.cancelFutureOccurrences(task.id!,
+          now: DateTime(2026, 1, 5, 8, 5));
+
+      expect(transport.calls, isEmpty);
+      expect(transport.scheduled.containsKey(reminder.id), isTrue);
+
+      final persistedRule = await recurrenceRepository.getRule(rule.id!);
+      expect(persistedRule?.endDate, DateTime(2026, 1, 5, 8, 0));
     });
   });
 

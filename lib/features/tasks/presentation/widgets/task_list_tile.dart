@@ -25,6 +25,7 @@ class TaskListTile extends StatelessWidget {
     required this.category,
     this.tags = const [],
     this.hasActiveSnooze = false,
+    this.recurrenceLabel,
     required this.onTap,
     required this.onToggleComplete,
     required this.onTogglePin,
@@ -36,6 +37,13 @@ class TaskListTile extends StatelessWidget {
   final CategoryModel? category;
   final List<TagModel> tags;
   final bool hasActiveSnooze;
+
+  /// A short recurrence summary (e.g. "Every day", "Every Monday") from
+  /// [recurrenceSummary], or null for a non-recurring task. Passed in
+  /// rather than computed here so this widget never has to know how to
+  /// load a [RecurrenceRuleModel] itself - callers already load
+  /// everything else about a task (category, tags) the same way.
+  final String? recurrenceLabel;
   final VoidCallback onTap;
   final VoidCallback onToggleComplete;
   final VoidCallback onTogglePin;
@@ -104,6 +112,22 @@ class TaskListTile extends StatelessWidget {
                           children: [
                             PriorityBadge(priority: task.priority),
                             StatusBadge(status: displayStatus),
+                            if (recurrenceLabel != null)
+                              Chip(
+                                avatar: Icon(Icons.repeat,
+                                    size: 14,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant),
+                                label: Text(recurrenceLabel!),
+                                backgroundColor: Theme.of(context)
+                                    .colorScheme
+                                    .surfaceContainerHighest
+                                    .withValues(alpha: 0.5),
+                                visualDensity: VisualDensity.compact,
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ),
                             if (category != null)
                               Chip(
                                 label: Text(category!.name),

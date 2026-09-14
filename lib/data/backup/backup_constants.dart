@@ -14,6 +14,12 @@ class BackupJsonKeys {
   static const String taskTags = 'taskTags';
   static const String reminders = 'reminders';
   static const String settings = 'settings';
+
+  /// Added for backup schema v2 (Part 12.5). Absent entirely in a backup
+  /// made by an older REmind version - see [BackupRepository] for how
+  /// that absence is treated as "no exceptions" rather than a validation
+  /// error.
+  static const String occurrenceExceptions = 'occurrenceExceptions';
 }
 
 /// The backup *file format* version - separate from the on-device SQLite
@@ -22,4 +28,13 @@ class BackupJsonKeys {
 /// restructured), so a backup made by an older REmind version can still be
 /// recognised - and, where the shape actually changed, upgraded - on the
 /// way back in, instead of just rejected.
-const int kBackupSchemaVersion = 1;
+///
+/// Version 2 (Part 12.5) adds the [BackupJsonKeys.occurrenceExceptions]
+/// table and new fields on `recurrenceRules` (`monthlyMode`,
+/// `weekOrdinal`) and `tasks` (`occurrenceOriginalDate`). A v1 backup
+/// restores perfectly well on a v2+ app: the new table is simply absent
+/// (treated as empty) and the new row fields are absent (their models
+/// already treat a missing key exactly like an explicit `null`, which is
+/// each new field's own "not set" state) - see
+/// [RecurrenceRuleModel.fromMap] and [TaskModel.fromMap].
+const int kBackupSchemaVersion = 2;

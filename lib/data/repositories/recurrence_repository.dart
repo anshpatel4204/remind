@@ -19,6 +19,8 @@ class RecurrenceRepository {
     int intervalValue = 1,
     List<int>? daysOfWeek,
     RecurrenceCustomUnit? customUnit,
+    RecurrenceMonthlyMode monthlyMode = RecurrenceMonthlyMode.dayOfMonth,
+    int? weekOrdinal,
     required DateTime startDate,
     DateTime? endDate,
     int? occurrencesCount,
@@ -28,6 +30,8 @@ class RecurrenceRepository {
       intervalValue: intervalValue,
       daysOfWeek: daysOfWeek,
       customUnit: customUnit,
+      monthlyMode: monthlyMode,
+      weekOrdinal: weekOrdinal,
       startDate: startDate,
       endDate: endDate,
       occurrencesCount: occurrencesCount,
@@ -37,6 +41,8 @@ class RecurrenceRepository {
       intervalValue: intervalValue,
       daysOfWeek: daysOfWeek,
       customUnit: customUnit,
+      monthlyMode: monthlyMode,
+      weekOrdinal: weekOrdinal,
       startDate: startDate,
       endDate: endDate,
       occurrencesCount: occurrencesCount,
@@ -57,6 +63,8 @@ class RecurrenceRepository {
       intervalValue: rule.intervalValue,
       daysOfWeek: rule.daysOfWeek,
       customUnit: rule.customUnit,
+      monthlyMode: rule.monthlyMode,
+      weekOrdinal: rule.weekOrdinal,
       startDate: rule.startDate,
       endDate: rule.endDate,
       occurrencesCount: rule.occurrencesCount,
@@ -66,6 +74,10 @@ class RecurrenceRepository {
 
   Future<void> deleteRule(int id) => _dataSource.delete(id);
 
+  /// Valid values for [RecurrenceRuleModel.weekOrdinal]: 1st-4th, or -1
+  /// for "last". See [WeekOrdinal].
+  static const List<int> _validWeekOrdinals = [1, 2, 3, 4, -1];
+
   /// Rejects any recurrence rule shape that [RecurrenceCalculator] could
   /// not correctly (or safely) compute occurrences for. Shared by
   /// [createRule] and [updateRule] so both paths are equally protected.
@@ -74,6 +86,8 @@ class RecurrenceRepository {
     required int intervalValue,
     List<int>? daysOfWeek,
     RecurrenceCustomUnit? customUnit,
+    required RecurrenceMonthlyMode monthlyMode,
+    int? weekOrdinal,
     required DateTime startDate,
     DateTime? endDate,
     int? occurrencesCount,
@@ -91,6 +105,28 @@ class RecurrenceRepository {
         throw ArgumentError(
           'daysOfWeek values must be ISO weekday numbers 1 (Monday) to 7 '
           '(Sunday), got $daysOfWeek',
+        );
+      }
+    }
+    if (frequency == RecurrenceFrequency.monthly &&
+        monthlyMode == RecurrenceMonthlyMode.weekdayPosition) {
+      if (daysOfWeek == null || daysOfWeek.length != 1) {
+        throw ArgumentError(
+          'A weekday-position monthly recurrence rule requires exactly '
+          'one target weekday in daysOfWeek, got $daysOfWeek',
+        );
+      }
+      if (daysOfWeek.first < 1 || daysOfWeek.first > 7) {
+        throw ArgumentError(
+          'daysOfWeek value must be an ISO weekday number 1 (Monday) to 7 '
+          '(Sunday), got ${daysOfWeek.first}',
+        );
+      }
+      if (weekOrdinal == null || !_validWeekOrdinals.contains(weekOrdinal)) {
+        throw ArgumentError(
+          'A weekday-position monthly recurrence rule requires weekOrdinal '
+          'to be one of $_validWeekOrdinals (1st-4th, or -1 for "last"), '
+          'got $weekOrdinal',
         );
       }
     }

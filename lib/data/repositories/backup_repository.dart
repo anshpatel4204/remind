@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../database/app_database.dart';
 import '../database/db_constants.dart';
 import '../models/category_model.dart';
+import '../models/occurrence_exception_model.dart';
 import '../models/recurrence_rule_model.dart';
 import '../models/reminder_model.dart';
 import '../models/setting_model.dart';
@@ -44,6 +45,7 @@ class BackupRepository {
     final taskTags = await db.query(TaskTagsTable.name);
     final reminders = await db.query(RemindersTable.name);
     final settings = await db.query(SettingsTable.name);
+    final occurrenceExceptions = await db.query(OccurrenceExceptionsTable.name);
 
     final backup = <String, Object?>{
       BackupJsonKeys.schemaVersion: kBackupSchemaVersion,
@@ -57,6 +59,7 @@ class BackupRepository {
         BackupJsonKeys.taskTags: taskTags,
         BackupJsonKeys.reminders: reminders,
         BackupJsonKeys.settings: settings,
+        BackupJsonKeys.occurrenceExceptions: occurrenceExceptions,
       },
     };
     return jsonEncode(backup);
@@ -132,6 +135,16 @@ class BackupRepository {
         ReminderModel.fromMap, RemindersTable.id);
     final settings = _parseSettings(data);
     final taskTags = _parseTaskTags(data);
+    // Optional: absent entirely in a backup made before Part 12.5 (backup
+    // schema v1), which is treated as "no recorded exceptions" rather
+    // than a validation failure - see BackupJsonKeys.occurrenceExceptions.
+    final occurrenceExceptions = _parseRows(
+      data,
+      BackupJsonKeys.occurrenceExceptions,
+      OccurrenceExceptionModel.fromMap,
+      OccurrenceExceptionsTable.id,
+      optional: true,
+    );
 
     final categoryIds = {for (final c in categories) c.id!};
     final recurrenceRuleIds = {for (final r in recurrenceRules) r.id!};
@@ -165,6 +178,14 @@ class BackupRepository {
         );
       }
     }
+    for (final exception in occurrenceExceptions) {
+      if (!recurrenceRuleIds.contains(exception.recurrenceRuleId)) {
+        throw const BackupValidationException(
+          'Backup is inconsistent: an occurrence exception refers to a '
+          'recurrence rule that is not in the backup.',
+        );
+      }
+    }
 
     return BackupData(
       schemaVersion: schemaVersion,
@@ -177,6 +198,7 @@ class BackupRepository {
       taskTags: taskTags,
       reminders: reminders,
       settings: settings,
+      occurrenceExceptions: occurrenceExceptions,
     );
   }
 
@@ -192,9 +214,11 @@ class BackupRepository {
     Map<String, Object?> data,
     String key,
     T Function(Map<String, Object?>) fromMap,
-    String idKey,
-  ) {
+    String idKey, {
+    bool optional = false,
+  }) {
     final raw = data[key];
+    if (raw == null && optional) return <T>[];
     if (raw is! List) {
       throw BackupValidationException('Backup is missing its "$key" section.');
     }
@@ -312,6 +336,9 @@ class BackupRepository {
       ],
       reminders: [for (final r in data.reminders) r.toMap(includeId: true)],
       settings: [for (final s in data.settings) s.toMap()],
+      occurrenceExceptions: [
+        for (final e in data.occurrenceExceptions) e.toMap(includeId: true)
+      ],
     );
   }
 }

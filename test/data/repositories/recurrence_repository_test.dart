@@ -61,7 +61,97 @@ void main() {
     expect(updated?.customUnit, RecurrenceCustomUnit.months);
   });
 
+  test('round-trips a monthly weekday-position rule', () async {
+    final created = await repository.createRule(
+      frequency: RecurrenceFrequency.monthly,
+      monthlyMode: RecurrenceMonthlyMode.weekdayPosition,
+      daysOfWeek: [DateTime.monday],
+      weekOrdinal: WeekOrdinal.first.value,
+      startDate: DateTime(2026, 1, 5),
+    );
+
+    final fetched = await repository.getRule(created.id!);
+    expect(fetched?.frequency, RecurrenceFrequency.monthly);
+    expect(fetched?.monthlyMode, RecurrenceMonthlyMode.weekdayPosition);
+    expect(fetched?.daysOfWeek, [DateTime.monday]);
+    expect(fetched?.weekOrdinal, WeekOrdinal.first.value);
+
+    // Round-trip through an update too (e.g. switching "first" to "last"
+    // Monday), so weekOrdinal is actually persisted, not silently dropped.
+    await repository.updateRule(
+      fetched!.copyWith(weekOrdinal: WeekOrdinal.last.value),
+    );
+    final updated = await repository.getRule(created.id!);
+    expect(updated?.weekOrdinal, WeekOrdinal.last.value);
+  });
+
+  test(
+      'a monthly rule defaults to dayOfMonth mode when monthlyMode is not '
+      'specified', () async {
+    final created = await repository.createRule(
+      frequency: RecurrenceFrequency.monthly,
+      startDate: DateTime(2026, 1, 15),
+    );
+
+    expect(created.monthlyMode, RecurrenceMonthlyMode.dayOfMonth);
+    final fetched = await repository.getRule(created.id!);
+    expect(fetched?.monthlyMode, RecurrenceMonthlyMode.dayOfMonth);
+  });
+
   group('invalid recurrence rejection', () {
+    test('rejects a monthly weekday-position rule with no target weekday', () {
+      expect(
+        () => repository.createRule(
+          frequency: RecurrenceFrequency.monthly,
+          monthlyMode: RecurrenceMonthlyMode.weekdayPosition,
+          weekOrdinal: WeekOrdinal.first.value,
+          startDate: DateTime(2026, 1, 5),
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test(
+        'rejects a monthly weekday-position rule with more than one '
+        'weekday selected', () {
+      expect(
+        () => repository.createRule(
+          frequency: RecurrenceFrequency.monthly,
+          monthlyMode: RecurrenceMonthlyMode.weekdayPosition,
+          daysOfWeek: [DateTime.monday, DateTime.friday],
+          weekOrdinal: WeekOrdinal.first.value,
+          startDate: DateTime(2026, 1, 5),
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('rejects a monthly weekday-position rule with no weekOrdinal', () {
+      expect(
+        () => repository.createRule(
+          frequency: RecurrenceFrequency.monthly,
+          monthlyMode: RecurrenceMonthlyMode.weekdayPosition,
+          daysOfWeek: [DateTime.monday],
+          startDate: DateTime(2026, 1, 5),
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test(
+        'rejects a monthly weekday-position rule with an out-of-range '
+        'weekOrdinal', () {
+      expect(
+        () => repository.createRule(
+          frequency: RecurrenceFrequency.monthly,
+          monthlyMode: RecurrenceMonthlyMode.weekdayPosition,
+          daysOfWeek: [DateTime.monday],
+          weekOrdinal: 5,
+          startDate: DateTime(2026, 1, 5),
+        ),
+        throwsArgumentError,
+      );
+    });
     test('rejects an intervalValue below 1', () {
       expect(
         () => repository.createRule(

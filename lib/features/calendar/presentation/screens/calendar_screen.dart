@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/utils/date_formatting.dart';
+import '../../../../core/utils/recurrence_text.dart';
 import '../../../../data/models/category_model.dart';
 import '../../../../data/models/enums.dart';
 import '../../../../data/models/reminder_model.dart';
@@ -13,6 +14,7 @@ import '../../../../presentation/widgets/remind_loading_state.dart';
 import '../../../../presentation/widgets/repository_scope.dart';
 import '../../../tasks/presentation/screens/task_details_screen.dart';
 import '../../../tasks/presentation/screens/task_form_screen.dart';
+import '../../../tasks/presentation/widgets/recurring_task_actions.dart';
 import '../../../tasks/presentation/widgets/task_list_tile.dart';
 
 final DateFormat _monthFormat = DateFormat('MMMM yyyy');
@@ -120,6 +122,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final tagsByTaskId = <int, List<TagModel>>{};
     final activeSnoozeTaskIds = <int>{};
     final remindersByTaskId = <int, List<ReminderModel>>{};
+    final recurrenceLabelByTaskId = <int, String>{};
     final tasksByDay = <DateTime, List<TaskModel>>{};
     for (final task in tasks) {
       final id = task.id!;
@@ -135,6 +138,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
       if (hasActiveSnooze) activeSnoozeTaskIds.add(id);
       final day = _dateOnly(task.dueDate!);
       tasksByDay.putIfAbsent(day, () => []).add(task);
+
+      final recurrenceRuleId = task.recurrenceRuleId;
+      if (recurrenceRuleId != null) {
+        final rule = await repos.recurrenceRepository.getRule(recurrenceRuleId);
+        if (rule != null) recurrenceLabelByTaskId[id] = recurrenceSummary(rule);
+      }
     }
 
     return _CalendarData(
@@ -143,6 +152,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       tagsByTaskId: tagsByTaskId,
       activeSnoozeTaskIds: activeSnoozeTaskIds,
       remindersByTaskId: remindersByTaskId,
+      recurrenceLabelByTaskId: recurrenceLabelByTaskId,
     );
   }
 
@@ -233,10 +243,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Future<void> _openEdit(TaskModel task) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => TaskFormScreen(existingTask: task)),
-    );
-    _reload();
+    final changed = await openRecurringAwareEdit(context, task);
+    if (changed) _reload();
   }
 
   Future<void> _toggleComplete(TaskModel task) async {
@@ -257,30 +265,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Future<void> _confirmDelete(TaskModel task) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete task?'),
-        content: Text(
-            '"${task.title}" will be permanently deleted, along with its reminder.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    if (!mounted) return;
-    final repos = RepositoryScope.of(context);
-    await repos.notificationScheduler.cancelNotificationsForTask(task.id!);
-    await repos.taskRepository.deleteTask(task.id!);
-    if (!mounted) return;
+    final deleted = await confirmAndDeleteTask(context, task);
+    if (!mounted || !deleted) return;
     _reload();
   }
 
@@ -463,6 +449,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 tags: data.tagsByTaskId[task.id] ?? const [],
                                 hasActiveSnooze:
                                     data.activeSnoozeTaskIds.contains(task.id),
+                                recurrenceLabel:
+                                    data.recurrenceLabelByTaskId[task.id],
                                 onTap: () => _openDetails(task),
                                 onToggleComplete: () => _toggleComplete(task),
                                 onTogglePin: () => _togglePin(task),
@@ -493,6 +481,7 @@ class _CalendarData {
     required this.tagsByTaskId,
     required this.activeSnoozeTaskIds,
     required this.remindersByTaskId,
+    required this.recurrenceLabelByTaskId,
   });
 
   final Map<DateTime, List<TaskModel>> tasksByDay;
@@ -500,6 +489,7 @@ class _CalendarData {
   final Map<int, List<TagModel>> tagsByTaskId;
   final Set<int> activeSnoozeTaskIds;
   final Map<int, List<ReminderModel>> remindersByTaskId;
+  final Map<int, String> recurrenceLabelByTaskId;
 }
 
 class _WeekdayHeader extends StatelessWidget {

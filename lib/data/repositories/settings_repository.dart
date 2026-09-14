@@ -37,8 +37,9 @@ class SettingsRepository {
     final raw = await getValue(_keyDefaultTaskPriority);
     if (raw == null) return null;
     final index = int.tryParse(raw);
-    if (index == null || index < 0 || index >= TaskPriority.values.length)
+    if (index == null || index < 0 || index >= TaskPriority.values.length) {
       return null;
+    }
     return TaskPriority.values[index];
   }
 

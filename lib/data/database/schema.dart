@@ -161,3 +161,92 @@ CREATE TABLE ${RecurrenceRulesTable.name} (
     createSettings,
   ];
 }
+
+/// SQL statements for schema version 4 (Part 12.5 - production recurring
+/// task & reminder system).
+///
+/// Changes from [SchemaV3]:
+///  - `recurrence_rules` gains `monthly_mode` and `week_ordinal`, so a
+///    monthly rule can repeat by weekday-position ("the second Tuesday of
+///    every month") as well as day-of-month.
+///  - `tasks` gains `occurrence_original_date` (see
+///    [TasksTable.occurrenceOriginalDate]).
+///  - a new `occurrence_exceptions` table records per-occurrence
+///    skip/cancel/reschedule actions without ever creating a row per
+///    future occurrence (see [OccurrenceExceptionsTable]).
+///
+/// Every other table is byte-for-byte identical to [SchemaV3], reused
+/// rather than redeclared for the same reason [SchemaV3] reuses
+/// [SchemaV2]'s unchanged tables.
+class SchemaV4 {
+  static const String createCategories = SchemaV2.createCategories;
+  static const String createTags = SchemaV2.createTags;
+
+  static const String createRecurrenceRules = '''
+CREATE TABLE ${RecurrenceRulesTable.name} (
+  ${RecurrenceRulesTable.id} INTEGER PRIMARY KEY AUTOINCREMENT,
+  ${RecurrenceRulesTable.frequency} INTEGER NOT NULL,
+  ${RecurrenceRulesTable.intervalValue} INTEGER NOT NULL DEFAULT 1,
+  ${RecurrenceRulesTable.daysOfWeek} TEXT,
+  ${RecurrenceRulesTable.startDate} INTEGER NOT NULL,
+  ${RecurrenceRulesTable.endDate} INTEGER,
+  ${RecurrenceRulesTable.occurrencesCount} INTEGER,
+  ${RecurrenceRulesTable.createdAt} INTEGER NOT NULL,
+  ${RecurrenceRulesTable.customUnit} INTEGER,
+  ${RecurrenceRulesTable.monthlyMode} INTEGER NOT NULL DEFAULT 0,
+  ${RecurrenceRulesTable.weekOrdinal} INTEGER
+)
+''';
+
+  static const String createTasks = '''
+CREATE TABLE ${TasksTable.name} (
+  ${TasksTable.id} INTEGER PRIMARY KEY AUTOINCREMENT,
+  ${TasksTable.title} TEXT NOT NULL,
+  ${TasksTable.description} TEXT,
+  ${TasksTable.priority} INTEGER NOT NULL DEFAULT 1,
+  ${TasksTable.status} INTEGER NOT NULL DEFAULT 0,
+  ${TasksTable.categoryId} INTEGER,
+  ${TasksTable.recurrenceRuleId} INTEGER,
+  ${TasksTable.dueDate} INTEGER,
+  ${TasksTable.createdAt} INTEGER NOT NULL,
+  ${TasksTable.updatedAt} INTEGER NOT NULL,
+  ${TasksTable.completedAt} INTEGER,
+  ${TasksTable.isPinned} INTEGER NOT NULL DEFAULT 0,
+  ${TasksTable.occurrenceOriginalDate} INTEGER,
+  FOREIGN KEY (${TasksTable.categoryId}) REFERENCES ${CategoriesTable.name} (${CategoriesTable.id}) ON DELETE SET NULL,
+  FOREIGN KEY (${TasksTable.recurrenceRuleId}) REFERENCES ${RecurrenceRulesTable.name} (${RecurrenceRulesTable.id}) ON DELETE SET NULL
+)
+''';
+
+  static const String createTaskTags = SchemaV2.createTaskTags;
+  static const String createReminders = SchemaV2.createReminders;
+  static const String createSettings = SchemaV2.createSettings;
+
+  static const String createOccurrenceExceptions = '''
+CREATE TABLE ${OccurrenceExceptionsTable.name} (
+  ${OccurrenceExceptionsTable.id} INTEGER PRIMARY KEY AUTOINCREMENT,
+  ${OccurrenceExceptionsTable.recurrenceRuleId} INTEGER NOT NULL,
+  ${OccurrenceExceptionsTable.occurrenceDate} INTEGER NOT NULL,
+  ${OccurrenceExceptionsTable.status} INTEGER NOT NULL,
+  ${OccurrenceExceptionsTable.rescheduledTo} INTEGER,
+  ${OccurrenceExceptionsTable.createdAt} INTEGER NOT NULL,
+  FOREIGN KEY (${OccurrenceExceptionsTable.recurrenceRuleId}) REFERENCES ${RecurrenceRulesTable.name} (${RecurrenceRulesTable.id}) ON DELETE CASCADE
+)
+''';
+
+  static const List<String> createIndexes = [
+    ...SchemaV2.createIndexes,
+    'CREATE UNIQUE INDEX idx_occurrence_exceptions_rule_date ON ${OccurrenceExceptionsTable.name} (${OccurrenceExceptionsTable.recurrenceRuleId}, ${OccurrenceExceptionsTable.occurrenceDate})',
+  ];
+
+  static const List<String> createAllTables = [
+    createCategories,
+    createTags,
+    createRecurrenceRules,
+    createTasks,
+    createTaskTags,
+    createReminders,
+    createSettings,
+    createOccurrenceExceptions,
+  ];
+}

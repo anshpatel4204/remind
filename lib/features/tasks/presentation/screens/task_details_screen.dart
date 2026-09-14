@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/category_colors.dart';
 import '../../../../core/utils/color_utils.dart';
 import '../../../../core/utils/date_formatting.dart';
+import '../../../../core/utils/recurrence_text.dart';
 import '../../../../core/utils/task_status_calculator.dart';
 import '../../../../data/models/category_model.dart';
 import '../../../../data/models/enums.dart';
 import '../../../../data/models/reminder_model.dart';
 import '../../../../data/models/tag_model.dart';
+import '../../../../data/models/recurrence_rule_model.dart';
 import '../../../../data/models/task_model.dart';
 import '../../../../presentation/widgets/remind_empty_state.dart';
 import '../../../../presentation/widgets/remind_error_state.dart';
@@ -15,8 +17,8 @@ import '../../../../presentation/widgets/remind_loading_state.dart';
 import '../../../../presentation/widgets/repository_scope.dart';
 import '../../../../services/notification/notification_scheduler.dart';
 import '../widgets/priority_badge.dart';
+import '../widgets/recurring_task_actions.dart';
 import '../widgets/status_badge.dart';
-import 'task_form_screen.dart';
 
 /// Full detail view for a single task: every field, its reminder (if any),
 /// and the Complete/Edit/Delete/Snooze/Reschedule actions.
@@ -56,12 +58,16 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     final tags = await repos.taskRepository.getTagsForTask(task.id!);
     final reminders =
         await repos.reminderRepository.getRemindersForTask(task.id!);
+    final recurrenceRule = task.recurrenceRuleId == null
+        ? null
+        : await repos.recurrenceRepository.getRule(task.recurrenceRuleId!);
 
     return _TaskDetailsData(
       task: task,
       category: category,
       tags: tags,
       reminder: reminders.isEmpty ? null : reminders.first,
+      recurrenceRule: recurrenceRule,
     );
   }
 
@@ -95,38 +101,69 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   }
 
   Future<void> _edit(TaskModel task) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => TaskFormScreen(existingTask: task)),
-    );
+    final changed = await openRecurringAwareEdit(context, task);
+    if (!mounted || !changed) return;
     _reload();
   }
 
   Future<void> _delete(TaskModel task) async {
+    final deleted = await confirmAndDeleteTask(context, task);
+    if (!mounted || !deleted) return;
+    Navigator.of(context).pop();
+  }
+
+  /// "Skip this occurrence": removes just the task's current occurrence
+  /// and rolls it forward to whichever occurrence comes after it -
+  /// nothing else in the series changes. See
+  /// ReminderEngine.skipCurrentOccurrence for the mechanics.
+  Future<void> _skipOccurrence(TaskModel task) async {
+    setState(() => _busy = true);
+    await RepositoryScope.of(context)
+        .notificationScheduler
+        .skipOccurrence(task.id!);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    _reload();
+    _showSnack('Occurrence skipped');
+  }
+
+  /// "Cancel future occurrences": the current occurrence (shown on this
+  /// screen right now) is left completely alone and can still be
+  /// completed/snoozed/rescheduled normally - only occurrences after it
+  /// stop being generated. See ReminderEngine.cancelFutureOccurrences.
+  Future<void> _cancelFutureOccurrences(TaskModel task) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete task?'),
-        content: Text(
-            '"${task.title}" will be permanently deleted, along with its reminder.'),
+        title: const Text('Cancel future occurrences?'),
+        content: const Text(
+          "This occurrence stays exactly as it is. No further occurrences "
+          "will be created after it, but this task and its history are "
+          "kept.",
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
+            child: const Text('Back'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Delete'),
+            child: const Text('Cancel future occurrences'),
           ),
         ],
       ),
     );
     if (confirmed != true) return;
     if (!mounted) return;
-    final repos = RepositoryScope.of(context);
-    await repos.notificationScheduler.cancelNotificationsForTask(task.id!);
-    await repos.taskRepository.deleteTask(task.id!);
+
+    setState(() => _busy = true);
+    await RepositoryScope.of(context)
+        .notificationScheduler
+        .cancelFutureOccurrences(task.id!);
     if (!mounted) return;
-    Navigator.of(context).pop();
+    setState(() => _busy = false);
+    _reload();
+    _showSnack('Future occurrences cancelled');
   }
 
   Future<void> _snooze(ReminderModel reminder) async {
@@ -150,7 +187,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     _showSnack('Reminder snoozed');
   }
 
-  Future<void> _reschedule(ReminderModel reminder) async {
+  Future<void> _reschedule(TaskModel task, ReminderModel reminder) async {
     final initial = reminder.snoozedUntil ?? reminder.reminderTime;
     final pickedDate = await showDatePicker(
       context: context,
@@ -176,9 +213,20 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     );
 
     setState(() => _busy = true);
-    await RepositoryScope.of(context)
-        .notificationScheduler
-        .updateAndRescheduleReminder(reminder.id!, newTime);
+    final repos = RepositoryScope.of(context);
+    if (task.recurrenceRuleId != null) {
+      // Recurring: goes through the occurrence-aware path, which moves
+      // just this one occurrence (and records it as such) without
+      // shifting the rest of the series - see
+      // ReminderEngine.rescheduleCurrentOccurrence.
+      await repos.notificationScheduler.rescheduleOccurrence(
+        task.id!,
+        newTime,
+      );
+    } else {
+      await repos.notificationScheduler
+          .updateAndRescheduleReminder(reminder.id!, newTime);
+    }
     if (!mounted) return;
     setState(() => _busy = false);
     _reload();
@@ -288,6 +336,20 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
             ? 'No due date set'
             : formatDateTime(task.dueDate!)),
         const SizedBox(height: 20),
+        if (data.recurrenceRule != null) ...[
+          Text('Repeats', style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Icon(Icons.repeat,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+              const SizedBox(width: 6),
+              Text(recurrenceSummary(data.recurrenceRule!)),
+            ],
+          ),
+          const SizedBox(height: 20),
+        ],
         Text('Tags', style: Theme.of(context).textTheme.labelLarge),
         const SizedBox(height: 4),
         data.tags.isEmpty
@@ -341,9 +403,21 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
               ),
             if (canSnoozeOrReschedule)
               OutlinedButton.icon(
-                onPressed: _busy ? null : () => _reschedule(reminder),
+                onPressed: _busy ? null : () => _reschedule(task, reminder),
                 icon: const Icon(Icons.event_repeat_outlined),
                 label: const Text('Reschedule'),
+              ),
+            if (task.recurrenceRuleId != null && !isCompleted)
+              OutlinedButton.icon(
+                onPressed: _busy ? null : () => _skipOccurrence(task),
+                icon: const Icon(Icons.skip_next_outlined),
+                label: const Text('Skip this occurrence'),
+              ),
+            if (task.recurrenceRuleId != null && !isCompleted)
+              OutlinedButton.icon(
+                onPressed: _busy ? null : () => _cancelFutureOccurrences(task),
+                icon: const Icon(Icons.event_busy_outlined),
+                label: const Text('Cancel future occurrences'),
               ),
             OutlinedButton.icon(
               onPressed: _busy ? null : () => _delete(task),
@@ -375,12 +449,14 @@ class _TaskDetailsData {
     required this.category,
     required this.tags,
     required this.reminder,
+    required this.recurrenceRule,
   });
 
   final TaskModel task;
   final CategoryModel? category;
   final List<TagModel> tags;
   final ReminderModel? reminder;
+  final RecurrenceRuleModel? recurrenceRule;
 }
 
 /// What the user picked from [_SnoozeOptionsSheet]: a preset [option], plus

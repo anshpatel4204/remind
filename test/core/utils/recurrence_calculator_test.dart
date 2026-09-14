@@ -11,6 +11,8 @@ RecurrenceRuleModel _rule({
   int intervalValue = 1,
   List<int>? daysOfWeek,
   RecurrenceCustomUnit? customUnit,
+  RecurrenceMonthlyMode monthlyMode = RecurrenceMonthlyMode.dayOfMonth,
+  int? weekOrdinal,
   required DateTime startDate,
   DateTime? endDate,
   int? occurrencesCount,
@@ -20,6 +22,8 @@ RecurrenceRuleModel _rule({
     intervalValue: intervalValue,
     daysOfWeek: daysOfWeek,
     customUnit: customUnit,
+    monthlyMode: monthlyMode,
+    weekOrdinal: weekOrdinal,
     startDate: startDate,
     endDate: endDate,
     occurrencesCount: occurrencesCount,
@@ -225,6 +229,132 @@ void main() {
         RecurrenceCalculator.nextOccurrence(rule,
             after: DateTime(2026, 4, 15, 9, 0)),
         DateTime(2026, 7, 15, 9, 0),
+      );
+    });
+  });
+
+  group('monthly - weekday position', () {
+    test('first Monday of every month', () {
+      // 2026-01-05 is the first Monday of January 2026.
+      final rule = _rule(
+        frequency: RecurrenceFrequency.monthly,
+        monthlyMode: RecurrenceMonthlyMode.weekdayPosition,
+        daysOfWeek: [DateTime.monday],
+        weekOrdinal: WeekOrdinal.first.value,
+        startDate: DateTime(2026, 1, 5, 9, 0),
+      );
+
+      expect(RecurrenceCalculator.firstOccurrence(rule),
+          DateTime(2026, 1, 5, 9, 0));
+      expect(
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 1, 5, 9, 0)),
+        DateTime(2026, 2, 2, 9, 0), // first Monday of February 2026
+      );
+      expect(
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 2, 2, 9, 0)),
+        DateTime(2026, 3, 2, 9, 0), // first Monday of March 2026
+      );
+    });
+
+    test('last Friday of every month', () {
+      final rule = _rule(
+        frequency: RecurrenceFrequency.monthly,
+        monthlyMode: RecurrenceMonthlyMode.weekdayPosition,
+        daysOfWeek: [DateTime.friday],
+        weekOrdinal: WeekOrdinal.last.value,
+        startDate: DateTime(2026, 1, 30, 17, 0), // last Friday of Jan 2026
+      );
+
+      expect(RecurrenceCalculator.firstOccurrence(rule),
+          DateTime(2026, 1, 30, 17, 0));
+      expect(
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 1, 30, 17, 0)),
+        DateTime(2026, 2, 27, 17, 0), // last Friday of Feb 2026
+      );
+      // February only has 4 Fridays that year, so "last" and "4th" land
+      // on the same date - the interesting month is one where "4th"
+      // would NOT exist, proven separately below.
+      expect(
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 2, 27, 17, 0)),
+        DateTime(2026, 3, 27, 17, 0), // last Friday of Mar 2026
+      );
+    });
+
+    test(
+        'a month with only 4 Fridays: "last Friday" and "4th Friday" agree, '
+        'proving "last" never fails to resolve', () {
+      // February 2026 has exactly 4 Fridays (6, 13, 20, 27) - a month
+      // that could plausibly break an off-by-one in a naive "5th Friday"
+      // lookup. "last" must still land on the 27th.
+      final rule = _rule(
+        frequency: RecurrenceFrequency.monthly,
+        monthlyMode: RecurrenceMonthlyMode.weekdayPosition,
+        daysOfWeek: [DateTime.friday],
+        weekOrdinal: WeekOrdinal.last.value,
+        startDate: DateTime(2026, 2, 1, 8, 0),
+      );
+
+      expect(RecurrenceCalculator.firstOccurrence(rule),
+          DateTime(2026, 2, 27, 8, 0));
+    });
+
+    test('every 2 months (interval) on the first Monday', () {
+      final rule = _rule(
+        frequency: RecurrenceFrequency.monthly,
+        intervalValue: 2,
+        monthlyMode: RecurrenceMonthlyMode.weekdayPosition,
+        daysOfWeek: [DateTime.monday],
+        weekOrdinal: WeekOrdinal.first.value,
+        startDate: DateTime(2026, 1, 5, 9, 0),
+      );
+
+      expect(
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 1, 5, 9, 0)),
+        DateTime(2026, 3, 2, 9, 0), // first Monday of March 2026
+      );
+      expect(
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 3, 2, 9, 0)),
+        DateTime(2026, 5, 4, 9, 0), // first Monday of May 2026
+      );
+    });
+
+    test(
+        'a start date that is not itself the target weekday/ordinal is not '
+        'treated as the first occurrence', () {
+      // 2026-01-05 is a Monday, but this rule targets the *third*
+      // Monday - the first real occurrence is Jan 19, not Jan 5.
+      final rule = _rule(
+        frequency: RecurrenceFrequency.monthly,
+        monthlyMode: RecurrenceMonthlyMode.weekdayPosition,
+        daysOfWeek: [DateTime.monday],
+        weekOrdinal: WeekOrdinal.third.value,
+        startDate: DateTime(2026, 1, 5, 9, 0),
+      );
+
+      expect(RecurrenceCalculator.firstOccurrence(rule),
+          DateTime(2026, 1, 19, 9, 0));
+    });
+
+    test('respects an end date', () {
+      final rule = _rule(
+        frequency: RecurrenceFrequency.monthly,
+        monthlyMode: RecurrenceMonthlyMode.weekdayPosition,
+        daysOfWeek: [DateTime.monday],
+        weekOrdinal: WeekOrdinal.first.value,
+        startDate: DateTime(2026, 1, 5, 9, 0),
+        endDate: DateTime(2026, 2, 2, 9, 0),
+      );
+
+      expect(
+        RecurrenceCalculator.nextOccurrence(rule,
+            after: DateTime(2026, 2, 2, 9, 0)),
+        isNull,
       );
     });
   });

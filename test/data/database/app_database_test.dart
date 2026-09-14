@@ -217,6 +217,166 @@ void main() {
     });
   });
 
+  group('schema migration v3 -> v4', () {
+    test(
+        'adds monthly_mode/week_ordinal/occurrence_original_date and the '
+        'occurrence_exceptions table, and preserves existing rows', () async {
+      final dir =
+          Directory.systemTemp.createTempSync('remind_migration_v3_v4_test_');
+      final path = p.join(dir.path, 'migration_v3_v4_test.db');
+
+      // Simulate a device already on version 3 (the schema shipped before
+      // this part), with one pre-existing recurring task and rule that of
+      // course predate every Part 12.5 column/table.
+      final legacyDb = await databaseFactory.openDatabase(
+        path,
+        options: OpenDatabaseOptions(
+          version: 3,
+          onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
+          onCreate: (db, version) async {
+            for (final statement in SchemaV3.createAllTables) {
+              await db.execute(statement);
+            }
+            for (final statement in SchemaV3.createIndexes) {
+              await db.execute(statement);
+            }
+          },
+        ),
+      );
+      final preExistingRuleId =
+          await legacyDb.insert(RecurrenceRulesTable.name, {
+        RecurrenceRulesTable.frequency: 2, // monthly
+        RecurrenceRulesTable.intervalValue: 1,
+        RecurrenceRulesTable.startDate:
+            DateTime(2026, 1, 15).millisecondsSinceEpoch,
+        RecurrenceRulesTable.createdAt:
+            DateTime(2026, 1, 15).millisecondsSinceEpoch,
+      });
+      final preExistingTaskId = await legacyDb.insert(TasksTable.name, {
+        TasksTable.title: 'Pre-existing recurring task from v3',
+        TasksTable.status: 0,
+        TasksTable.priority: 1,
+        TasksTable.recurrenceRuleId: preExistingRuleId,
+        TasksTable.dueDate: DateTime(2026, 1, 15).millisecondsSinceEpoch,
+        TasksTable.createdAt: DateTime(2026, 1, 1).millisecondsSinceEpoch,
+        TasksTable.updatedAt: DateTime(2026, 1, 1).millisecondsSinceEpoch,
+      });
+      await legacyDb.close();
+
+      // Now open the same file through AppDatabase (version 4). This must
+      // trigger onUpgrade's v3 -> v4 step rather than onCreate, and must
+      // not lose the pre-existing task or rule.
+      final appDatabase = AppDatabase(testDatabasePath: path);
+      final db = await appDatabase.database;
+
+      final ruleColumns =
+          (await db.rawQuery("PRAGMA table_info(${RecurrenceRulesTable.name})"))
+              .map((c) => c['name'] as String)
+              .toSet();
+      expect(ruleColumns.contains(RecurrenceRulesTable.monthlyMode), isTrue);
+      expect(ruleColumns.contains(RecurrenceRulesTable.weekOrdinal), isTrue);
+
+      final taskColumns =
+          (await db.rawQuery("PRAGMA table_info(${TasksTable.name})"))
+              .map((c) => c['name'] as String)
+              .toSet();
+      expect(taskColumns.contains(TasksTable.occurrenceOriginalDate), isTrue);
+
+      final tableNames = (await db
+              .rawQuery("SELECT name FROM sqlite_master WHERE type = 'table'"))
+          .map((r) => r['name'] as String)
+          .toSet();
+      expect(tableNames.contains(OccurrenceExceptionsTable.name), isTrue);
+
+      final rules = await db.query(RecurrenceRulesTable.name);
+      expect(rules, hasLength(1));
+      expect(rules.first[RecurrenceRulesTable.id], preExistingRuleId);
+      // A column added by ALTER TABLE with a DEFAULT backfills existing
+      // rows with that default (dayOfMonth = 0), matching every rule that
+      // existed before weekday-position mode did.
+      expect(rules.first[RecurrenceRulesTable.monthlyMode], 0);
+      expect(rules.first[RecurrenceRulesTable.weekOrdinal], isNull);
+
+      final tasks = await db.query(TasksTable.name);
+      expect(tasks, hasLength(1));
+      expect(tasks.first[TasksTable.id], preExistingTaskId);
+      expect(
+          tasks.first[TasksTable.title], 'Pre-existing recurring task from v3');
+      expect(tasks.first[TasksTable.occurrenceOriginalDate], isNull);
+
+      // The new table starts empty - nothing is backfilled into it.
+      expect(await db.query(OccurrenceExceptionsTable.name), isEmpty);
+
+      await appDatabase.close();
+      dir.deleteSync(recursive: true);
+    });
+
+    test(
+        'a fresh install at the current version already has every '
+        'Part 12.5 column and table', () async {
+      final testDb = TestAppDatabase.create();
+      final db = await testDb.appDatabase.database;
+
+      final ruleColumns =
+          (await db.rawQuery("PRAGMA table_info(${RecurrenceRulesTable.name})"))
+              .map((c) => c['name'] as String)
+              .toSet();
+      expect(ruleColumns.contains(RecurrenceRulesTable.monthlyMode), isTrue);
+      expect(ruleColumns.contains(RecurrenceRulesTable.weekOrdinal), isTrue);
+
+      final taskColumns =
+          (await db.rawQuery("PRAGMA table_info(${TasksTable.name})"))
+              .map((c) => c['name'] as String)
+              .toSet();
+      expect(taskColumns.contains(TasksTable.occurrenceOriginalDate), isTrue);
+
+      final tableNames = (await db
+              .rawQuery("SELECT name FROM sqlite_master WHERE type = 'table'"))
+          .map((r) => r['name'] as String)
+          .toSet();
+      expect(tableNames.contains(OccurrenceExceptionsTable.name), isTrue);
+
+      await testDb.tearDown();
+    });
+
+    test(
+        'the occurrence_exceptions unique (rule, date) index rejects a '
+        'duplicate occurrence', () async {
+      final testDb = TestAppDatabase.create();
+      final db = await testDb.appDatabase.database;
+
+      final ruleId = await db.insert(RecurrenceRulesTable.name, {
+        RecurrenceRulesTable.frequency: 0,
+        RecurrenceRulesTable.intervalValue: 1,
+        RecurrenceRulesTable.startDate:
+            DateTime(2026, 1, 1).millisecondsSinceEpoch,
+        RecurrenceRulesTable.createdAt:
+            DateTime(2026, 1, 1).millisecondsSinceEpoch,
+      });
+      final occurrenceDate = DateTime(2026, 1, 1).millisecondsSinceEpoch;
+      await db.insert(OccurrenceExceptionsTable.name, {
+        OccurrenceExceptionsTable.recurrenceRuleId: ruleId,
+        OccurrenceExceptionsTable.occurrenceDate: occurrenceDate,
+        OccurrenceExceptionsTable.status: 0,
+        OccurrenceExceptionsTable.createdAt:
+            DateTime(2026, 1, 1).millisecondsSinceEpoch,
+      });
+
+      expect(
+        () => db.insert(OccurrenceExceptionsTable.name, {
+          OccurrenceExceptionsTable.recurrenceRuleId: ruleId,
+          OccurrenceExceptionsTable.occurrenceDate: occurrenceDate,
+          OccurrenceExceptionsTable.status: 1,
+          OccurrenceExceptionsTable.createdAt:
+              DateTime(2026, 1, 1).millisecondsSinceEpoch,
+        }),
+        throwsA(isA<DatabaseException>()),
+      );
+
+      await testDb.tearDown();
+    });
+  });
+
   group('database restart (close and reopen the same file)', () {
     test('data survives closing the database and reopening the same file',
         () async {

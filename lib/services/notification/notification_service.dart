@@ -35,8 +35,9 @@ class NotificationService implements NotificationTransport {
   }
 
   static String _channelName(bool soundEnabled, bool vibrationEnabled) {
-    if (soundEnabled && vibrationEnabled)
+    if (soundEnabled && vibrationEnabled) {
       return 'Task reminders (sound & vibration)';
+    }
     if (soundEnabled) return 'Task reminders (sound only)';
     if (vibrationEnabled) return 'Task reminders (vibration only)';
     return 'Task reminders (silent)';

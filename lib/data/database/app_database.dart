@@ -47,10 +47,10 @@ class AppDatabase {
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    for (final statement in SchemaV3.createAllTables) {
+    for (final statement in SchemaV4.createAllTables) {
       await db.execute(statement);
     }
-    for (final statement in SchemaV3.createIndexes) {
+    for (final statement in SchemaV4.createIndexes) {
       await db.execute(statement);
     }
     await _seedDefaultCategories(db);
@@ -62,6 +62,9 @@ class AppDatabase {
     }
     if (oldVersion < 3) {
       await _upgradeV2ToV3(db);
+    }
+    if (oldVersion < 4) {
+      await _upgradeV3ToV4(db);
     }
     // Future schema changes append another `if (oldVersion < N)` step here.
     // Each step is additive and migrates data before dropping anything, so
@@ -118,6 +121,36 @@ FROM tasks_old_v1
     );
   }
 
+  /// Adds the schema v4 columns/table for Part 12.5's recurring task
+  /// system:
+  ///  - `recurrence_rules.monthly_mode` (`NOT NULL DEFAULT 0`, i.e.
+  ///    day-of-month) and `recurrence_rules.week_ordinal` (nullable) - a
+  ///    pre-v4 monthly rule has no notion of weekday-position recurrence,
+  ///    so defaulting every existing row to day-of-month mode with no
+  ///    ordinal reproduces its exact previous behavior.
+  ///  - `tasks.occurrence_original_date` (nullable) - null means "this
+  ///    task's current occurrence has never been individually
+  ///    rescheduled", true of every pre-v4 row.
+  ///  - the new, empty `occurrence_exceptions` table plus its unique
+  ///    (rule, date) index.
+  ///
+  /// No existing row in any table loses data or changes meaning.
+  Future<void> _upgradeV3ToV4(Database db) async {
+    await db.execute(
+      'ALTER TABLE ${RecurrenceRulesTable.name} ADD COLUMN ${RecurrenceRulesTable.monthlyMode} INTEGER NOT NULL DEFAULT 0',
+    );
+    await db.execute(
+      'ALTER TABLE ${RecurrenceRulesTable.name} ADD COLUMN ${RecurrenceRulesTable.weekOrdinal} INTEGER',
+    );
+    await db.execute(
+      'ALTER TABLE ${TasksTable.name} ADD COLUMN ${TasksTable.occurrenceOriginalDate} INTEGER',
+    );
+    await db.execute(SchemaV4.createOccurrenceExceptions);
+    await db.execute(
+      'CREATE UNIQUE INDEX idx_occurrence_exceptions_rule_date ON ${OccurrenceExceptionsTable.name} (${OccurrenceExceptionsTable.recurrenceRuleId}, ${OccurrenceExceptionsTable.occurrenceDate})',
+    );
+  }
+
   Future<void> _seedDefaultCategories(Database db) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     final batch = db.batch();
@@ -139,9 +172,10 @@ FROM tasks_old_v1
   ///
   /// Insert order matters: children are inserted after the parents their
   /// foreign keys point at (categories/tags/recurrence_rules, then tasks,
-  /// then task_tags/reminders), matching dependency order in the schema
-  /// (see [SchemaV3]) so `PRAGMA foreign_keys = ON` never rejects a row.
-  /// Deletion runs in the opposite order for the same reason.
+  /// then task_tags/reminders/occurrence_exceptions), matching dependency
+  /// order in the schema (see [SchemaV4]) so `PRAGMA foreign_keys = ON`
+  /// never rejects a row. Deletion runs in the opposite order for the
+  /// same reason.
   Future<void> replaceAllData({
     required List<Map<String, Object?>> categories,
     required List<Map<String, Object?>> tags,
@@ -150,9 +184,11 @@ FROM tasks_old_v1
     required List<Map<String, Object?>> taskTags,
     required List<Map<String, Object?>> reminders,
     required List<Map<String, Object?>> settings,
+    List<Map<String, Object?>> occurrenceExceptions = const [],
   }) async {
     final db = await database;
     await db.transaction((txn) async {
+      await txn.delete(OccurrenceExceptionsTable.name);
       await txn.delete(RemindersTable.name);
       await txn.delete(TaskTagsTable.name);
       await txn.delete(TasksTable.name);
@@ -179,6 +215,9 @@ FROM tasks_old_v1
       }
       for (final row in reminders) {
         await txn.insert(RemindersTable.name, row);
+      }
+      for (final row in occurrenceExceptions) {
+        await txn.insert(OccurrenceExceptionsTable.name, row);
       }
       for (final row in settings) {
         await txn.insert(SettingsTable.name, row);

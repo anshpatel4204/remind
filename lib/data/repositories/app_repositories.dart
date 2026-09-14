@@ -3,6 +3,7 @@ import '../../services/notification/notification_transport.dart';
 import '../../services/reminder/reminder_engine.dart';
 import '../database/app_database.dart';
 import '../datasources/category_data_source.dart';
+import '../datasources/occurrence_exception_data_source.dart';
 import '../datasources/recurrence_rule_data_source.dart';
 import '../datasources/reminder_data_source.dart';
 import '../datasources/settings_data_source.dart';
@@ -11,6 +12,7 @@ import '../datasources/task_data_source.dart';
 import '../datasources/task_tag_data_source.dart';
 import 'backup_repository.dart';
 import 'category_repository.dart';
+import 'occurrence_exception_repository.dart';
 import 'recurrence_repository.dart';
 import 'reminder_repository.dart';
 import 'settings_repository.dart';
@@ -42,10 +44,13 @@ class AppRepositories {
     final reminderRepository = ReminderRepository(ReminderDataSource(db));
     final recurrenceRepository =
         RecurrenceRepository(RecurrenceRuleDataSource(db));
+    final occurrenceExceptionRepository =
+        OccurrenceExceptionRepository(OccurrenceExceptionDataSource(db));
     final reminderEngine = ReminderEngine(
       taskRepository: taskRepository,
       reminderRepository: reminderRepository,
       recurrenceRepository: recurrenceRepository,
+      occurrenceExceptionRepository: occurrenceExceptionRepository,
     );
     final settingsRepository = SettingsRepository(SettingsDataSource(db));
     return AppRepositories._(
@@ -55,6 +60,7 @@ class AppRepositories {
       tagRepository: TagRepository(TagDataSource(db), taskTagDataSource),
       settingsRepository: settingsRepository,
       recurrenceRepository: recurrenceRepository,
+      occurrenceExceptionRepository: occurrenceExceptionRepository,
       reminderEngine: reminderEngine,
       notificationScheduler: NotificationScheduler(
         transport: notificationTransport,
@@ -74,6 +80,7 @@ class AppRepositories {
     required this.tagRepository,
     required this.settingsRepository,
     required this.recurrenceRepository,
+    required this.occurrenceExceptionRepository,
     required this.reminderEngine,
     required this.notificationScheduler,
     required this.backupRepository,
@@ -85,6 +92,12 @@ class AppRepositories {
   final TagRepository tagRepository;
   final SettingsRepository settingsRepository;
   final RecurrenceRepository recurrenceRepository;
+
+  /// Per-occurrence recurrence exception history (skip/cancel/reschedule
+  /// records) - see [OccurrenceExceptionRepository]. Screens read this
+  /// only for display (e.g. an occurrence history list); every mutation
+  /// goes through [reminderEngine].
+  final OccurrenceExceptionRepository occurrenceExceptionRepository;
 
   /// Dedicated recurrence/reminder scheduling logic (see [ReminderEngine]
   /// itself for what it does and doesn't do). Screens should call this

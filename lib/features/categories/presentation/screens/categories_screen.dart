@@ -241,8 +241,9 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                   trailing: PopupMenuButton<String>(
                     tooltip: 'Category options',
                     onSelected: (value) {
-                      if (value == 'edit')
+                      if (value == 'edit') {
                         _showCategoryDialog(existing: category);
+                      }
                       if (value == 'delete') _confirmDelete(category);
                     },
                     itemBuilder: (context) => [

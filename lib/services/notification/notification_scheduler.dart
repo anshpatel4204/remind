@@ -356,6 +356,80 @@ class NotificationScheduler {
     }
   }
 
+  /// "Skip this occurrence" (and, equivalently, "Delete this occurrence")
+  /// for a recurring task: cancels the current occurrence's scheduled
+  /// notification, rolls the task forward to whatever occurrence comes
+  /// after it (see [ReminderEngine.skipCurrentOccurrence] - the rest of
+  /// the series, and the task's own completion history, are untouched),
+  /// and schedules a notification for that new occurrence. If the
+  /// recurrence has no occurrence left after the skipped one, nothing is
+  /// rescheduled - mirroring how [completeTask] handles a recurrence
+  /// that has ended.
+  Future<void> skipOccurrence(int taskId, {DateTime? now}) async {
+    final reminders = await _reminderRepository.getRemindersForTask(taskId);
+    for (final reminder in reminders) {
+      final id = reminder.id;
+      if (id != null) await _transport.cancel(id);
+    }
+
+    final rolled =
+        await _reminderEngine.skipCurrentOccurrence(taskId, now: now);
+    if (rolled == null) return;
+
+    for (final reminder in reminders) {
+      final id = reminder.id;
+      if (id == null) continue;
+      final shifted = await _reminderRepository.getReminder(id);
+      if (shifted != null) await _scheduleNotificationFor(shifted);
+    }
+  }
+
+  /// "Reschedule this occurrence" (and, with this pass's scope, "Edit
+  /// this occurrence") for a recurring task: moves just the current
+  /// occurrence to [newDateTime] via
+  /// [ReminderEngine.rescheduleCurrentOccurrence], which keeps the rest
+  /// of the series on its original schedule. The occurrence's existing
+  /// notification(s) are always cancelled *before* the replacement is
+  /// scheduled, so there is never a moment where two notifications exist
+  /// for the same reminder - the same guarantee
+  /// [updateAndRescheduleReminder] gives a plain one-off reminder.
+  Future<void> rescheduleOccurrence(
+    int taskId,
+    DateTime newDateTime, {
+    DateTime? now,
+  }) async {
+    final reminders = await _reminderRepository.getRemindersForTask(taskId);
+    for (final reminder in reminders) {
+      final id = reminder.id;
+      if (id != null) await _transport.cancel(id);
+    }
+
+    final updated = await _reminderEngine.rescheduleCurrentOccurrence(
+      taskId,
+      newDateTime,
+      now: now,
+    );
+    if (updated == null) return;
+
+    for (final reminder in reminders) {
+      final id = reminder.id;
+      if (id == null) continue;
+      final shifted = await _reminderRepository.getReminder(id);
+      if (shifted != null) await _scheduleNotificationFor(shifted);
+    }
+  }
+
+  /// "Cancel future occurrences" for a recurring task: the current
+  /// occurrence's own scheduled notification is left exactly as it is
+  /// (it still fires normally, and can still be completed/snoozed/
+  /// rescheduled) - only the recurrence rule itself is closed off (see
+  /// [ReminderEngine.cancelFutureOccurrences]) so nothing new ever gets
+  /// generated after it. Nothing here needs to touch the platform
+  /// notification layer at all.
+  Future<void> cancelFutureOccurrences(int taskId, {DateTime? now}) async {
+    await _reminderEngine.cancelFutureOccurrences(taskId, now: now);
+  }
+
   /// Cancels the scheduled notification for every reminder attached to
   /// [taskId], without touching any database row. Call this before
   /// deleting a task: its reminders will be cascade-deleted from the

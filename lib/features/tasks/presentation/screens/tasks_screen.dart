@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/utils/recurrence_text.dart';
 import '../../../../data/models/category_model.dart';
 import '../../../../data/models/enums.dart';
 import '../../../../data/models/tag_model.dart';
@@ -13,6 +14,7 @@ import '../../../../presentation/widgets/repository_scope.dart';
 import '../../../categories/presentation/screens/categories_screen.dart';
 import '../../../search/presentation/screens/search_screen.dart';
 import '../../../tags/presentation/screens/tags_screen.dart';
+import '../widgets/recurring_task_actions.dart';
 import '../widgets/task_filter_sheet.dart';
 import '../widgets/task_list_tile.dart';
 import 'task_details_screen.dart';
@@ -72,6 +74,7 @@ class _TasksScreenState extends State<TasksScreen> {
     final now = DateTime.now();
     final tagsByTaskId = <int, List<TagModel>>{};
     final activeSnoozeTaskIds = <int>{};
+    final recurrenceLabelByTaskId = <int, String>{};
     for (final task in tasks) {
       final id = task.id!;
       tagsByTaskId[id] = await repos.taskRepository.getTagsForTask(id);
@@ -83,6 +86,12 @@ class _TasksScreenState extends State<TasksScreen> {
             r.snoozedUntil!.isAfter(now),
       );
       if (hasActiveSnooze) activeSnoozeTaskIds.add(id);
+
+      final recurrenceRuleId = task.recurrenceRuleId;
+      if (recurrenceRuleId != null) {
+        final rule = await repos.recurrenceRepository.getRule(recurrenceRuleId);
+        if (rule != null) recurrenceLabelByTaskId[id] = recurrenceSummary(rule);
+      }
     }
 
     return _TaskListData(
@@ -92,6 +101,7 @@ class _TasksScreenState extends State<TasksScreen> {
       tags: tags,
       tagsByTaskId: tagsByTaskId,
       activeSnoozeTaskIds: activeSnoozeTaskIds,
+      recurrenceLabelByTaskId: recurrenceLabelByTaskId,
     );
   }
 
@@ -116,10 +126,8 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Future<void> _openEdit(TaskModel task) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => TaskFormScreen(existingTask: task)),
-    );
-    _reload();
+    final changed = await openRecurringAwareEdit(context, task);
+    if (changed) _reload();
   }
 
   Future<void> _toggleComplete(TaskModel task) async {
@@ -144,30 +152,8 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Future<void> _confirmDelete(TaskModel task) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete task?'),
-        content: Text(
-            '"${task.title}" will be permanently deleted, along with its reminder.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    if (!mounted) return;
-    final repos = RepositoryScope.of(context);
-    await repos.notificationScheduler.cancelNotificationsForTask(task.id!);
-    await repos.taskRepository.deleteTask(task.id!);
-    if (!mounted) return;
+    final deleted = await confirmAndDeleteTask(context, task);
+    if (!mounted || !deleted) return;
     _reload();
   }
 
@@ -350,6 +336,8 @@ class _TasksScreenState extends State<TasksScreen> {
                               tags: data.tagsByTaskId[task.id] ?? const [],
                               hasActiveSnooze:
                                   data.activeSnoozeTaskIds.contains(task.id),
+                              recurrenceLabel:
+                                  data.recurrenceLabelByTaskId[task.id],
                               onTap: () => _openDetails(task),
                               onToggleComplete: () => _toggleComplete(task),
                               onTogglePin: () => _togglePin(task),
@@ -382,6 +370,7 @@ class _TaskListData {
     required this.tags,
     required this.tagsByTaskId,
     required this.activeSnoozeTaskIds,
+    required this.recurrenceLabelByTaskId,
   });
 
   final List<TaskModel> tasks;
@@ -390,6 +379,7 @@ class _TaskListData {
   final List<TagModel> tags;
   final Map<int, List<TagModel>> tagsByTaskId;
   final Set<int> activeSnoozeTaskIds;
+  final Map<int, String> recurrenceLabelByTaskId;
 }
 
 /// One pill in the Tasks screen's quick date-range row (All/Today/

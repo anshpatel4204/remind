@@ -1,10 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:remind/data/datasources/occurrence_exception_data_source.dart';
 import 'package:remind/data/datasources/recurrence_rule_data_source.dart';
 import 'package:remind/data/datasources/reminder_data_source.dart';
 import 'package:remind/data/datasources/task_data_source.dart';
 import 'package:remind/data/datasources/task_tag_data_source.dart';
 import 'package:remind/data/models/enums.dart';
+import 'package:remind/data/repositories/occurrence_exception_repository.dart';
 import 'package:remind/data/repositories/recurrence_repository.dart';
 import 'package:remind/data/repositories/reminder_repository.dart';
 import 'package:remind/data/repositories/task_repository.dart';
@@ -19,6 +21,7 @@ void main() {
   late TaskRepository taskRepository;
   late ReminderRepository reminderRepository;
   late RecurrenceRepository recurrenceRepository;
+  late OccurrenceExceptionRepository occurrenceExceptionRepository;
   late ReminderEngine engine;
 
   setUp(() {
@@ -31,10 +34,13 @@ void main() {
         ReminderRepository(ReminderDataSource(testDb.appDatabase));
     recurrenceRepository =
         RecurrenceRepository(RecurrenceRuleDataSource(testDb.appDatabase));
+    occurrenceExceptionRepository = OccurrenceExceptionRepository(
+        OccurrenceExceptionDataSource(testDb.appDatabase));
     engine = ReminderEngine(
       taskRepository: taskRepository,
       reminderRepository: reminderRepository,
       recurrenceRepository: recurrenceRepository,
+      occurrenceExceptionRepository: occurrenceExceptionRepository,
     );
   });
 
@@ -395,6 +401,373 @@ void main() {
       final caughtUp = await engine.catchUpMissedOccurrence(999999,
           now: DateTime(2026, 1, 6));
       expect(caughtUp, isNull);
+    });
+  });
+
+  group('skipCurrentOccurrence', () {
+    test(
+        'rolls the task forward to the occurrence after the skipped one, '
+        'without marking it completed', () async {
+      final rule = await recurrenceRepository.createRule(
+        frequency: RecurrenceFrequency.daily,
+        startDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      final task = await taskRepository.createTask(
+        title: 'Drink water',
+        recurrenceRuleId: rule.id,
+        dueDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      final reminder = await engine.scheduleReminder(
+        taskId: task.id!,
+        reminderTime: DateTime(2026, 1, 1, 8, 0),
+      );
+
+      final skipped = await engine.skipCurrentOccurrence(
+        task.id!,
+        now: DateTime(2026, 1, 1, 8, 5),
+      );
+
+      expect(skipped, isNotNull);
+      expect(skipped!.dueDate, DateTime(2026, 1, 2, 8, 0));
+      // Skipping is not completing - status/completedAt are untouched.
+      expect(skipped.status, TaskStatus.pending);
+      expect(skipped.completedAt, isNull);
+
+      final persistedReminder =
+          await reminderRepository.getReminder(reminder.id!);
+      expect(persistedReminder?.reminderTime, DateTime(2026, 1, 2, 8, 0));
+    });
+
+    test('records a skipped occurrence exception for the skipped date',
+        () async {
+      final rule = await recurrenceRepository.createRule(
+        frequency: RecurrenceFrequency.daily,
+        startDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      final task = await taskRepository.createTask(
+        title: 'Drink water',
+        recurrenceRuleId: rule.id,
+        dueDate: DateTime(2026, 1, 1, 8, 0),
+      );
+
+      await engine.skipCurrentOccurrence(task.id!,
+          now: DateTime(2026, 1, 1, 8, 5));
+
+      final exception = await occurrenceExceptionRepository.getForOccurrence(
+        rule.id!,
+        DateTime(2026, 1, 1, 8, 0),
+      );
+      expect(exception, isNotNull);
+      expect(exception?.status, OccurrenceExceptionStatus.skipped);
+    });
+
+    test(
+        'skipping today does not affect tomorrow\'s occurrence - the '
+        "recurrence rule and its future schedule are untouched", () async {
+      final rule = await recurrenceRepository.createRule(
+        frequency: RecurrenceFrequency.daily,
+        startDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      final task = await taskRepository.createTask(
+        title: 'Drink water',
+        recurrenceRuleId: rule.id,
+        dueDate: DateTime(2026, 1, 1, 8, 0),
+      );
+
+      await engine.skipCurrentOccurrence(task.id!,
+          now: DateTime(2026, 1, 1, 8, 5));
+
+      // The rule itself is unchanged - tomorrow (now the current
+      // occurrence) still leads to the day after normally.
+      final persistedTask = await taskRepository.getTask(task.id!);
+      final next = await engine.getNextOccurrence(
+        recurrenceRuleId: rule.id!,
+        after: persistedTask!.dueDate!,
+      );
+      expect(next, DateTime(2026, 1, 3, 8, 0));
+      expect((await recurrenceRepository.getRule(rule.id!))?.endDate, isNull);
+    });
+
+    test(
+        'skipping a rescheduled occurrence advances from its original '
+        'anchor, not the rescheduled time', () async {
+      final rule = await recurrenceRepository.createRule(
+        frequency: RecurrenceFrequency.daily,
+        startDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      final task = await taskRepository.createTask(
+        title: 'Drink water',
+        recurrenceRuleId: rule.id,
+        dueDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      // Move just today's occurrence to 2pm.
+      await engine.rescheduleCurrentOccurrence(
+        task.id!,
+        DateTime(2026, 1, 1, 14, 0),
+        now: DateTime(2026, 1, 1, 8, 0),
+      );
+
+      final skipped = await engine.skipCurrentOccurrence(
+        task.id!,
+        now: DateTime(2026, 1, 1, 14, 5),
+      );
+
+      // The series continues from Jan 1 (the canonical anchor), landing
+      // on Jan 2 at the rule's original 8:00 time - not Jan 2 at 2pm.
+      expect(skipped?.dueDate, DateTime(2026, 1, 2, 8, 0));
+    });
+
+    test('returns null once the recurrence has no occurrence left to roll to',
+        () async {
+      final rule = await recurrenceRepository.createRule(
+        frequency: RecurrenceFrequency.daily,
+        startDate: DateTime(2026, 1, 1, 8, 0),
+        occurrencesCount: 1,
+      );
+      final task = await taskRepository.createTask(
+        title: 'One-off under the hood',
+        recurrenceRuleId: rule.id,
+        dueDate: DateTime(2026, 1, 1, 8, 0),
+      );
+
+      final skipped = await engine.skipCurrentOccurrence(task.id!,
+          now: DateTime(2026, 1, 1, 8, 5));
+
+      expect(skipped, isNull);
+    });
+
+    test('returns null for a task that is not recurring', () async {
+      final task = await taskRepository.createTask(
+        title: 'Just a one-time task',
+        dueDate: DateTime(2026, 1, 1, 8, 0),
+      );
+
+      final skipped = await engine.skipCurrentOccurrence(task.id!);
+      expect(skipped, isNull);
+    });
+  });
+
+  group('rescheduleCurrentOccurrence', () {
+    test('moves only the current occurrence, leaving the rule untouched',
+        () async {
+      final rule = await recurrenceRepository.createRule(
+        frequency: RecurrenceFrequency.daily,
+        startDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      final task = await taskRepository.createTask(
+        title: 'Drink water',
+        recurrenceRuleId: rule.id,
+        dueDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      final reminder = await engine.scheduleReminder(
+        taskId: task.id!,
+        reminderTime: DateTime(2026, 1, 1, 8, 0),
+      );
+
+      final rescheduled = await engine.rescheduleCurrentOccurrence(
+        task.id!,
+        DateTime(2026, 1, 1, 14, 0),
+        now: DateTime(2026, 1, 1, 8, 0),
+      );
+
+      expect(rescheduled, isNotNull);
+      expect(rescheduled!.dueDate, DateTime(2026, 1, 1, 14, 0));
+      expect(rescheduled.occurrenceOriginalDate, DateTime(2026, 1, 1, 8, 0));
+
+      final persistedReminder =
+          await reminderRepository.getReminder(reminder.id!);
+      expect(persistedReminder?.reminderTime, DateTime(2026, 1, 1, 14, 0));
+
+      // The recurrence rule's own definition is completely unchanged.
+      final persistedRule = await recurrenceRepository.getRule(rule.id!);
+      expect(persistedRule?.startDate, DateTime(2026, 1, 1, 8, 0));
+    });
+
+    test('records a rescheduled occurrence exception', () async {
+      final rule = await recurrenceRepository.createRule(
+        frequency: RecurrenceFrequency.daily,
+        startDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      final task = await taskRepository.createTask(
+        title: 'Drink water',
+        recurrenceRuleId: rule.id,
+        dueDate: DateTime(2026, 1, 1, 8, 0),
+      );
+
+      await engine.rescheduleCurrentOccurrence(
+        task.id!,
+        DateTime(2026, 1, 1, 14, 0),
+        now: DateTime(2026, 1, 1, 8, 0),
+      );
+
+      final exception = await occurrenceExceptionRepository.getForOccurrence(
+        rule.id!,
+        DateTime(2026, 1, 1, 8, 0),
+      );
+      expect(exception?.status, OccurrenceExceptionStatus.rescheduled);
+      expect(exception?.rescheduledTo, DateTime(2026, 1, 1, 14, 0));
+    });
+
+    test(
+        'completing a rescheduled occurrence advances the series from its '
+        'original anchor, not the rescheduled time', () async {
+      final rule = await recurrenceRepository.createRule(
+        frequency: RecurrenceFrequency.daily,
+        startDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      final task = await taskRepository.createTask(
+        title: 'Drink water',
+        recurrenceRuleId: rule.id,
+        dueDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      await engine.rescheduleCurrentOccurrence(
+        task.id!,
+        DateTime(2026, 1, 1, 14, 0),
+        now: DateTime(2026, 1, 1, 8, 0),
+      );
+      await taskRepository.completeTask(task.id!);
+
+      final rolled = await engine.handleCompletedRecurringTask(
+        task.id!,
+        now: DateTime(2026, 1, 1, 14, 5),
+      );
+
+      // Next occurrence is Jan 2 at the rule's original 8:00 time, not
+      // Jan 2 at 2pm (which a naive "anchor on dueDate" implementation
+      // would have produced).
+      expect(rolled?.dueDate, DateTime(2026, 1, 2, 8, 0));
+      // The one-off reschedule bookkeeping is cleared once the series
+      // has moved on to a fresh occurrence.
+      expect(rolled?.occurrenceOriginalDate, isNull);
+    });
+
+    test('returns null for a task that is not recurring', () async {
+      final task = await taskRepository.createTask(
+        title: 'Just a one-time task',
+        dueDate: DateTime(2026, 1, 1, 8, 0),
+      );
+
+      final rescheduled = await engine.rescheduleCurrentOccurrence(
+        task.id!,
+        DateTime(2026, 1, 2, 8, 0),
+      );
+      expect(rescheduled, isNull);
+    });
+  });
+
+  group('cancelFutureOccurrences', () {
+    test(
+        'stops the series after the current occurrence while preserving '
+        'the task and its current due date', () async {
+      final rule = await recurrenceRepository.createRule(
+        frequency: RecurrenceFrequency.daily,
+        startDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      final task = await taskRepository.createTask(
+        title: 'Take medicine',
+        recurrenceRuleId: rule.id,
+        dueDate: DateTime(2026, 1, 5, 8, 0),
+      );
+
+      final result = await engine.cancelFutureOccurrences(
+        task.id!,
+        now: DateTime(2026, 1, 5, 8, 5),
+      );
+
+      expect(result, isNotNull);
+      // The task itself (its history, its current due date) is preserved
+      // - this is not the same as deleting the task or its rule.
+      final persistedTask = await taskRepository.getTask(task.id!);
+      expect(persistedTask, isNotNull);
+      expect(persistedTask?.dueDate, DateTime(2026, 1, 5, 8, 0));
+      expect(persistedTask?.recurrenceRuleId, rule.id);
+
+      // The rule itself still exists, now bounded to end at the current
+      // occurrence.
+      final persistedRule = await recurrenceRepository.getRule(rule.id!);
+      expect(persistedRule, isNotNull);
+      expect(persistedRule?.endDate, DateTime(2026, 1, 5, 8, 0));
+    });
+
+    test('the current occurrence remains valid and completable', () async {
+      final rule = await recurrenceRepository.createRule(
+        frequency: RecurrenceFrequency.daily,
+        startDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      final task = await taskRepository.createTask(
+        title: 'Take medicine',
+        recurrenceRuleId: rule.id,
+        dueDate: DateTime(2026, 1, 5, 8, 0),
+      );
+
+      await engine.cancelFutureOccurrences(task.id!,
+          now: DateTime(2026, 1, 5, 8, 5));
+
+      // The occurrence exactly at the new endDate still qualifies.
+      final firstOccurrence = await engine.getNextOccurrence(
+        recurrenceRuleId: rule.id!,
+        after: DateTime(2026, 1, 5, 7, 59),
+      );
+      expect(firstOccurrence, DateTime(2026, 1, 5, 8, 0));
+
+      // But nothing after it does.
+      final next = await engine.getNextOccurrence(
+        recurrenceRuleId: rule.id!,
+        after: DateTime(2026, 1, 5, 8, 0),
+      );
+      expect(next, isNull);
+    });
+
+    test(
+        'cancelling from the very first occurrence does not throw (endDate '
+        'never ends up before startDate)', () async {
+      final rule = await recurrenceRepository.createRule(
+        frequency: RecurrenceFrequency.daily,
+        startDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      final task = await taskRepository.createTask(
+        title: 'Take medicine',
+        recurrenceRuleId: rule.id,
+        dueDate: DateTime(2026, 1, 1, 8, 0),
+      );
+
+      await engine.cancelFutureOccurrences(task.id!,
+          now: DateTime(2026, 1, 1, 8, 5));
+
+      final persistedRule = await recurrenceRepository.getRule(rule.id!);
+      expect(persistedRule?.endDate, DateTime(2026, 1, 1, 8, 0));
+      expect(persistedRule?.startDate, DateTime(2026, 1, 1, 8, 0));
+    });
+
+    test('records a cancelled occurrence exception', () async {
+      final rule = await recurrenceRepository.createRule(
+        frequency: RecurrenceFrequency.daily,
+        startDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      final task = await taskRepository.createTask(
+        title: 'Take medicine',
+        recurrenceRuleId: rule.id,
+        dueDate: DateTime(2026, 1, 5, 8, 0),
+      );
+
+      await engine.cancelFutureOccurrences(task.id!,
+          now: DateTime(2026, 1, 5, 8, 5));
+
+      final exception = await occurrenceExceptionRepository.getForOccurrence(
+        rule.id!,
+        DateTime(2026, 1, 5, 8, 0),
+      );
+      expect(exception?.status, OccurrenceExceptionStatus.cancelled);
+    });
+
+    test('returns null for a task that is not recurring', () async {
+      final task = await taskRepository.createTask(
+        title: 'Just a one-time task',
+        dueDate: DateTime(2026, 1, 1, 8, 0),
+      );
+
+      final result = await engine.cancelFutureOccurrences(task.id!);
+      expect(result, isNull);
     });
   });
 

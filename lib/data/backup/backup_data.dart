@@ -1,4 +1,5 @@
 import '../models/category_model.dart';
+import '../models/occurrence_exception_model.dart';
 import '../models/recurrence_rule_model.dart';
 import '../models/reminder_model.dart';
 import '../models/setting_model.dart';
@@ -34,6 +35,7 @@ class BackupData {
     required this.taskTags,
     required this.reminders,
     required this.settings,
+    this.occurrenceExceptions = const [],
   });
 
   final int schemaVersion;
@@ -48,6 +50,10 @@ class BackupData {
   final List<ReminderModel> reminders;
   final List<SettingModel> settings;
 
+  /// Added for backup schema v2 (Part 12.5). Empty for a backup made by
+  /// an older REmind version - see [BackupJsonKeys.occurrenceExceptions].
+  final List<OccurrenceExceptionModel> occurrenceExceptions;
+
   /// Total row count across every table - shown on the restore
   /// confirmation dialog so the user has a concrete sense of how much
   /// data they're about to bring in (and, implicitly, whether a backup is
@@ -59,5 +65,6 @@ class BackupData {
       tasks.length +
       taskTags.length +
       reminders.length +
-      settings.length;
+      settings.length +
+      occurrenceExceptions.length;
 }

@@ -28,6 +28,26 @@ enum _StepKind { days, months }
 /// day components instead lets Dart's own [DateTime] constructor do the
 /// normalizing (rolling January 32nd into February 1st, etc.), which is
 /// well-defined, DST-safe, and leap-year-aware.
+///
+/// ### Monthly recurrence's two modes
+///
+/// A [RecurrenceFrequency.monthly] rule fires in one of two ways (see
+/// [RecurrenceRuleModel.monthlyMode]):
+///  - Day-of-month (the original, default behavior): the same calendar
+///    day every month (e.g. "the 15th"), taken from `startDate.day`. When
+///    a target month is too short to have that day (e.g. "the 31st" in
+///    April), REmind's chosen, consistent, documented behavior is to
+///    **clamp to the target month's last day** - "the 31st" becomes "the
+///    30th" in a 30-day month and "the 28th/29th" in February - never
+///    silently overflowing into the following month. This is exactly
+///    what [_addMonths] already did before Part 12.5 and remains
+///    unchanged.
+///  - Weekday-position (new in Part 12.5): "the first Monday of every
+///    month", "the last Friday of every month", etc. This mode has no
+///    such edge case to document in the first place - every month has at
+///    least four of every weekday, and always has exactly one "last"
+///    occurrence of any weekday, so every ordinal this app exposes
+///    (first/second/third/fourth/last) always resolves to a real date.
 class RecurrenceCalculator {
   RecurrenceCalculator._();
 
@@ -38,9 +58,9 @@ class RecurrenceCalculator {
   static const int _maxIterations = 100000;
 
   /// The very first occurrence of [rule] - normally its `startDate`
-  /// itself, except for a weekly rule whose `startDate` does not fall on
-  /// one of its selected weekdays, in which case it is the first matching
-  /// weekday at/after `startDate`.
+  /// itself, except for a weekly (or monthly weekday-position) rule whose
+  /// `startDate` does not itself fall on a qualifying date, in which case
+  /// it is the first matching date at/after `startDate`.
   static DateTime? firstOccurrence(RecurrenceRuleModel rule) {
     return nextOccurrence(rule, after: rule.startDate, inclusive: true);
   }
@@ -83,8 +103,12 @@ class RecurrenceCalculator {
         yield* _weeklyOccurrences(rule);
         return;
       case RecurrenceFrequency.monthly:
-        yield* _unitStepOccurrences(rule,
-            kind: _StepKind.months, amount: rule.intervalValue);
+        if (rule.monthlyMode == RecurrenceMonthlyMode.weekdayPosition) {
+          yield* _monthlyWeekdayPositionOccurrences(rule);
+        } else {
+          yield* _unitStepOccurrences(rule,
+              kind: _StepKind.months, amount: rule.intervalValue);
+        }
         return;
       case RecurrenceFrequency.yearly:
         yield* _unitStepOccurrences(rule,
@@ -129,13 +153,13 @@ class RecurrenceCalculator {
     }
   }
 
-  /// Simple calendar stepping used by daily/monthly/yearly and every
-  /// "custom" variant: occurrence index `i` is `startDate` advanced by
-  /// `amount * i` of [kind] (days or months), clamping the day-of-month
-  /// when a target month is shorter than `startDate`'s day (see
-  /// [_addMonths]) - this is what correctly turns "the 31st" into "the
-  /// 28th/29th/30th" in a shorter month instead of overflowing into the
-  /// month after, and what correctly turns "yearly on Feb 29" into
+  /// Simple calendar stepping used by daily/monthly(day-of-month)/yearly
+  /// and every "custom" variant: occurrence index `i` is `startDate`
+  /// advanced by `amount * i` of [kind] (days or months), clamping the
+  /// day-of-month when a target month is shorter than `startDate`'s day
+  /// (see [_addMonths]) - this is what correctly turns "the 31st" into
+  /// "the 28th/29th/30th" in a shorter month instead of overflowing into
+  /// the month after, and what correctly turns "yearly on Feb 29" into
   /// "Feb 28" on a non-leap year.
   static Iterable<DateTime> _unitStepOccurrences(
     RecurrenceRuleModel rule, {
@@ -154,8 +178,9 @@ class RecurrenceCalculator {
           ? _addDays(rule.startDate, amount * index)
           : _addMonths(rule.startDate, amount * index);
       if (rule.endDate != null && occurrence.isAfter(rule.endDate!)) return;
-      if (rule.occurrencesCount != null && index >= rule.occurrencesCount!)
+      if (rule.occurrencesCount != null && index >= rule.occurrencesCount!) {
         return;
+      }
       yield occurrence;
       index++;
     }
@@ -199,13 +224,131 @@ class RecurrenceCalculator {
         final candidate = _addDays(blockMonday, weekday - 1);
         if (candidate.isBefore(start)) continue;
         if (rule.endDate != null && candidate.isAfter(rule.endDate!)) return;
-        if (rule.occurrencesCount != null && index >= rule.occurrencesCount!)
+        if (rule.occurrencesCount != null && index >= rule.occurrencesCount!) {
           return;
+        }
         yield candidate;
         index++;
       }
       block++;
     }
+  }
+
+  /// Monthly weekday-position stepping, e.g. "the first Monday of every
+  /// month" or "the last Friday of every month", repeated every
+  /// `intervalValue` months.
+  ///
+  /// Occurrence index `i` targets the month `intervalValue * i` months
+  /// after `startDate`'s own month (the *month* advances the same way
+  /// [_addMonths] does; only the day-of-month is computed differently -
+  /// see [_nthWeekdayOfMonth] - since there is no "day of month" to clamp
+  /// in this mode). A candidate before `startDate` (possible only for
+  /// `i == 0`, if `startDate` itself isn't that month's qualifying
+  /// weekday) is skipped rather than counted as an occurrence, exactly
+  /// like [_weeklyOccurrences] does for its own `startDate` edge case.
+  static Iterable<DateTime> _monthlyWeekdayPositionOccurrences(
+      RecurrenceRuleModel rule) sync* {
+    final weekdays = rule.daysOfWeek;
+    final ordinal = rule.weekOrdinal;
+    if (weekdays == null || weekdays.isEmpty || ordinal == null) {
+      // RecurrenceRepository's validation never lets a weekday-position
+      // monthly rule reach storage without exactly one target weekday
+      // and an ordinal; a hand-built rule that violates that contract
+      // simply produces no occurrences.
+      return;
+    }
+    final weekday = weekdays.first;
+    final start = rule.startDate;
+
+    var index = 0;
+    var occurrenceCount = 0;
+    while (true) {
+      if (index > _maxIterations) {
+        throw StateError(
+          'RecurrenceCalculator: exceeded $_maxIterations iterations '
+          'computing monthly weekday-position occurrences for rule '
+          '${rule.id}',
+        );
+      }
+      final target =
+          _shiftYearMonth(start.year, start.month, rule.intervalValue * index);
+      final occurrence = _nthWeekdayOfMonth(
+        target.year,
+        target.month,
+        weekday,
+        ordinal,
+        start,
+      );
+      if (occurrence != null && !occurrence.isBefore(start)) {
+        if (rule.endDate != null && occurrence.isAfter(rule.endDate!)) return;
+        if (rule.occurrencesCount != null &&
+            occurrenceCount >= rule.occurrencesCount!) {
+          return;
+        }
+        yield occurrence;
+        occurrenceCount++;
+      }
+      index++;
+    }
+  }
+
+  /// The date of the [ordinal]-th [isoWeekday] (1 = Monday .. 7 = Sunday)
+  /// in [year]/[month] - or, for `ordinal == -1`, the *last* [isoWeekday]
+  /// in that month - with [timeOf]'s time-of-day attached. `ordinal` 1-4
+  /// always resolves (every month has at least four of every weekday) and
+  /// -1 always resolves (every month has a last occurrence of any
+  /// weekday); this only returns null for an out-of-range `ordinal` a
+  /// hand-built rule might otherwise pass in (e.g. 5, or 0).
+  static DateTime? _nthWeekdayOfMonth(
+    int year,
+    int month,
+    int isoWeekday,
+    int ordinal,
+    DateTime timeOf,
+  ) {
+    final daysInMonth = _daysInMonth(year, month);
+    if (ordinal == -1) {
+      for (var day = daysInMonth; day >= 1; day--) {
+        if (DateTime(year, month, day).weekday == isoWeekday) {
+          return _atTimeOf(year, month, day, timeOf);
+        }
+      }
+      return null;
+    }
+    if (ordinal < 1) return null;
+    var count = 0;
+    for (var day = 1; day <= daysInMonth; day++) {
+      if (DateTime(year, month, day).weekday == isoWeekday) {
+        count++;
+        if (count == ordinal) return _atTimeOf(year, month, day, timeOf);
+      }
+    }
+    return null;
+  }
+
+  static DateTime _atTimeOf(int year, int month, int day, DateTime timeOf) {
+    return DateTime(
+      year,
+      month,
+      day,
+      timeOf.hour,
+      timeOf.minute,
+      timeOf.second,
+      timeOf.millisecond,
+      timeOf.microsecond,
+    );
+  }
+
+  /// [year]/[month] advanced by [monthsToAdd] whole calendar months (which
+  /// may be 0), with the year rolling over correctly either direction is
+  /// never needed here since `monthsToAdd` is always >= 0, but the modulo
+  /// arithmetic is written to stay correct regardless.
+  static ({int year, int month}) _shiftYearMonth(
+      int year, int month, int monthsToAdd) {
+    final totalMonths = (month - 1) + monthsToAdd;
+    final targetYear = year + totalMonths ~/ 12;
+    final targetMonth = (totalMonths % 12) + 1;
+    return (year: targetYear, month: targetMonth);
   }
 
   /// Adds [days] calendar days to [start], preserving its time-of-day
@@ -238,13 +381,11 @@ class RecurrenceCalculator {
   /// [months] is always >= 0 here (an occurrence index times a positive
   /// interval), so the plain non-negative modulo/division below is safe.
   static DateTime _addMonths(DateTime start, int months) {
-    final totalMonths = (start.month - 1) + months;
-    final targetYear = start.year + totalMonths ~/ 12;
-    final targetMonth = (totalMonths % 12) + 1;
-    final targetDay = _clampDay(start.day, targetYear, targetMonth);
+    final shifted = _shiftYearMonth(start.year, start.month, months);
+    final targetDay = _clampDay(start.day, shifted.year, shifted.month);
     return DateTime(
-      targetYear,
-      targetMonth,
+      shifted.year,
+      shifted.month,
       targetDay,
       start.hour,
       start.minute,

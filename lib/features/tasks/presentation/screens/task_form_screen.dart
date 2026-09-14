@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/utils/date_formatting.dart';
+import '../../../../core/utils/recurrence_text.dart';
 import '../../../../data/models/category_model.dart';
 import '../../../../data/models/enums.dart';
+import '../../../../data/models/recurrence_rule_model.dart';
 import '../../../../data/models/reminder_model.dart';
 import '../../../../data/models/tag_model.dart';
 import '../../../../data/models/task_model.dart';
+import '../../../../data/repositories/app_repositories.dart';
 import '../../../../presentation/widgets/remind_loading_state.dart';
 import '../../../../presentation/widgets/repository_scope.dart';
+import '../widgets/recurrence_draft.dart';
+import 'recurrence_config_screen.dart';
 
 /// A single form used for both creating a new task and editing an existing
 /// one. Pass [existingTask] to edit; omit it to create.
@@ -43,6 +48,19 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
   DateTime? _reminderDate;
   TimeOfDay? _reminderTime;
   ReminderModel? _existingReminder;
+
+  /// Null means "does not repeat". See [RecurrenceDraft] for why this is
+  /// kept separate from a real [RecurrenceRuleModel] until the form is
+  /// actually saved.
+  RecurrenceDraft? _recurrenceDraft;
+
+  /// The recurrence rule as it was when this form loaded (an existing
+  /// recurring task only) - kept around purely so [_reconcileRecurrence]
+  /// can tell whether the user actually changed the recurrence pattern
+  /// (or the due date) in this edit session, as opposed to editing some
+  /// unrelated field (title, priority, ...) and saving - see its own docs
+  /// for why that distinction matters.
+  RecurrenceRuleModel? _loadedRecurrenceRule;
 
   List<CategoryModel> _categories = [];
   List<TagModel> _tags = [];
@@ -100,6 +118,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
 
     Set<int> selectedTagIds = {};
     ReminderModel? existingReminder;
+    RecurrenceDraft? recurrenceDraft;
+    RecurrenceRuleModel? loadedRule;
 
     final task = widget.existingTask;
     if (task != null) {
@@ -112,6 +132,13 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       final reminders =
           await repos.reminderRepository.getRemindersForTask(task.id!);
       existingReminder = reminders.isEmpty ? null : reminders.first;
+
+      if (task.recurrenceRuleId != null) {
+        loadedRule =
+            await repos.recurrenceRepository.getRule(task.recurrenceRuleId!);
+        recurrenceDraft =
+            loadedRule == null ? null : RecurrenceDraft.fromRule(loadedRule);
+      }
     }
 
     // Only a brand-new task picks up the Settings > Tasks defaults - an
@@ -143,6 +170,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
         _categoryId = null;
       }
       _existingReminder = existingReminder;
+      _recurrenceDraft = recurrenceDraft;
+      _loadedRecurrenceRule = loadedRule;
       if (existingReminder != null) {
         _reminderEnabled = existingReminder.isEnabled;
         _reminderDate = DateTime(
@@ -213,6 +242,31 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
     if (picked != null) setState(() => _reminderTime = picked);
   }
 
+  /// Opens the Repeat picker. Requires a due date to already be set - the
+  /// recurrence's own start date/time is always the task's due date/time
+  /// (see [RecurrenceConfigScreen]'s docs for why REmind doesn't ask for a
+  /// separate one) - so the Repeat control itself is disabled until a due
+  /// date exists (see its `enabled:` below).
+  Future<void> _openRecurrencePicker() async {
+    final startDateTime = _combinedDueDateTime;
+    if (startDateTime == null) return;
+
+    final result = await Navigator.of(context).push<RecurrenceConfigResult>(
+      MaterialPageRoute(
+        builder: (_) => RecurrenceConfigScreen(
+          seriesStartDateTime: startDateTime,
+          initialDraft: _recurrenceDraft,
+        ),
+      ),
+    );
+    // A null result means the user backed out of the picker entirely -
+    // leave whatever recurrence choice was already there untouched. A
+    // non-null result (even one whose own `.draft` is null, for "Does
+    // not repeat") is an explicit, confirmed choice.
+    if (result == null) return;
+    setState(() => _recurrenceDraft = result.draft);
+  }
+
   Future<void> _addNewTag(String name) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return;
@@ -260,6 +314,12 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content: Text('Pick a reminder date, or turn the reminder off.')),
+      );
+      return;
+    }
+    if (_recurrenceDraft != null && _combinedDueDateTime == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pick a due date, or turn Repeat off.')),
       );
       return;
     }
@@ -319,11 +379,150 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
             .deleteReminder(_existingReminder!.id!);
       }
 
+      await _reconcileRecurrence(repos, task);
+
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  /// Creates, updates, or removes [task]'s recurrence rule to match
+  /// [_recurrenceDraft], after the task's own fields/tags/reminder have
+  /// already been saved above.
+  ///
+  /// Editing an *existing* recurring task's pattern (or its due
+  /// date/time) here restarts the series from the task's current due
+  /// date/time (rather than its original creation date) - this is what
+  /// makes "This and future occurrences" and "Entire series" the same
+  /// operation in REmind's single-row-per-series architecture (see the
+  /// Part 12.5 final report and `openRecurringAwareEdit`): there is no
+  /// separate historical occurrence data for a "future-only" change to
+  /// leave untouched, so the new pattern simply takes over from here on.
+  ///
+  /// If the user saved the form WITHOUT changing the Repeat pattern or
+  /// the due date - e.g. they only edited the title or priority of a
+  /// recurring task - this deliberately does nothing to the rule or to
+  /// [TaskModel.occurrenceOriginalDate]. Otherwise an unrelated edit
+  /// would silently discard a pending "Reschedule this occurrence only"
+  /// (whose entire point is to move just one occurrence while the rest
+  /// of the series keeps its original anchor - see
+  /// `ReminderEngine.rescheduleCurrentOccurrence`), which would violate
+  /// the "editing one occurrence must not affect the whole series" rule.
+  Future<void> _reconcileRecurrence(
+      AppRepositories repos, TaskModel task) async {
+    final draft = _recurrenceDraft;
+    final existingRuleId = task.recurrenceRuleId;
+
+    if (draft == null) {
+      if (existingRuleId == null) return;
+      await repos.recurrenceRepository.deleteRule(existingRuleId);
+      await repos.taskRepository.updateTask(
+        task.copyWith(
+          clearRecurrenceRuleId: true,
+          clearOccurrenceOriginalDate: true,
+        ),
+      );
+      return;
+    }
+
+    final startDate = _combinedDueDateTime!;
+
+    if (existingRuleId != null) {
+      final existingRule = _loadedRecurrenceRule ??
+          await repos.recurrenceRepository.getRule(existingRuleId);
+
+      // Nothing to reconcile against - leave the task/rule as they are
+      // rather than guessing.
+      if (existingRule == null) return;
+
+      final dueDateChanged = task.dueDate != startDate;
+      final patternChanged = _recurrencePatternChanged(existingRule, draft);
+
+      // Neither the Repeat pattern nor the due date actually changed in
+      // this edit session (e.g. the user only changed the title or
+      // priority) - don't touch the rule's startDate or clear a pending
+      // one-off occurrence reschedule.
+      if (!patternChanged && !dueDateChanged) return;
+
+      await repos.recurrenceRepository.updateRule(
+        existingRule.copyWith(
+          frequency: draft.frequency,
+          intervalValue: draft.intervalValue,
+          daysOfWeek: draft.daysOfWeek,
+          clearDaysOfWeek: draft.daysOfWeek == null,
+          customUnit: draft.customUnit,
+          clearCustomUnit: draft.customUnit == null,
+          monthlyMode: draft.monthlyMode,
+          weekOrdinal: draft.weekOrdinal,
+          clearWeekOrdinal: draft.weekOrdinal == null,
+          startDate: startDate,
+          endDate: draft.endDate,
+          clearEndDate: draft.endDate == null,
+        ),
+      );
+      if (task.occurrenceOriginalDate != null || task.dueDate != startDate) {
+        await repos.taskRepository.updateTask(
+          task.copyWith(dueDate: startDate, clearOccurrenceOriginalDate: true),
+        );
+      }
+      return;
+    }
+
+    final newRule = await repos.recurrenceRepository.createRule(
+      frequency: draft.frequency,
+      intervalValue: draft.intervalValue,
+      daysOfWeek: draft.daysOfWeek,
+      customUnit: draft.customUnit,
+      monthlyMode: draft.monthlyMode,
+      weekOrdinal: draft.weekOrdinal,
+      startDate: startDate,
+      endDate: draft.endDate,
+    );
+    await repos.taskRepository.updateTask(
+      task.copyWith(recurrenceRuleId: newRule.id, dueDate: startDate),
+    );
+  }
+
+  /// Whether [draft] describes a genuinely different recurrence pattern
+  /// than [existingRule] (the rule as it was when this form was opened,
+  /// captured in [_loadedRecurrenceRule]).
+  ///
+  /// Used by [_reconcileRecurrence] to avoid resetting a recurring
+  /// series' anchor date, and clearing a pending one-off occurrence
+  /// reschedule, just because the user saved an edit that had nothing to
+  /// do with its Repeat settings or due date - see that method's doc
+  /// comment for why this matters.
+  bool _recurrencePatternChanged(
+    RecurrenceRuleModel existingRule,
+    RecurrenceDraft draft,
+  ) {
+    if (existingRule.frequency != draft.frequency) return true;
+    if (existingRule.intervalValue != draft.intervalValue) return true;
+    if (!_sameDaysOfWeek(existingRule.daysOfWeek, draft.daysOfWeek)) {
+      return true;
+    }
+    if (existingRule.customUnit != draft.customUnit) return true;
+    if (existingRule.monthlyMode != draft.monthlyMode) return true;
+    if (existingRule.weekOrdinal != draft.weekOrdinal) return true;
+    if (existingRule.endDate != draft.endDate) return true;
+    return false;
+  }
+
+  /// Order-independent equality for the `daysOfWeek` recurrence field
+  /// (weekly recurrence stores the selected weekdays in any order; a
+  /// re-sorted-but-otherwise-identical list should not count as a
+  /// pattern change).
+  bool _sameDaysOfWeek(List<int>? a, List<int>? b) {
+    if (a == null || b == null) return a == b;
+    if (a.length != b.length) return false;
+    final sortedA = [...a]..sort();
+    final sortedB = [...b]..sort();
+    for (var i = 0; i < sortedA.length; i++) {
+      if (sortedA[i] != sortedB[i]) return false;
+    }
+    return true;
   }
 
   @override
@@ -450,13 +649,25 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
               enabled: _dueDate != null,
               onTap: _dueDate == null ? null : _pickDueTime,
             ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Repeat'),
+              subtitle: Text(_dueDate == null
+                  ? 'Set a due date first'
+                  : (_recurrenceDraft == null
+                      ? 'Does not repeat'
+                      : recurrenceSummary(_recurrenceDraft!
+                          .toPreviewRule(_combinedDueDateTime!)))),
+              trailing: const Icon(Icons.repeat),
+              enabled: _dueDate != null,
+              onTap: _dueDate == null ? null : _openRecurrencePicker,
+            ),
             const Divider(height: 32),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Remind me'),
-              subtitle: const Text(
-                'Saves a reminder time. Actual notifications are not implemented yet.',
-              ),
+              subtitle:
+                  const Text('Sends a notification at the reminder time.'),
               value: _reminderEnabled,
               onChanged: (value) => setState(() {
                 _reminderEnabled = value;

@@ -12,6 +12,7 @@ class TaskModel {
     this.categoryId,
     this.recurrenceRuleId,
     this.dueDate,
+    this.occurrenceOriginalDate,
     required this.createdAt,
     required this.updatedAt,
     this.completedAt,
@@ -26,6 +27,19 @@ class TaskModel {
   final int? categoryId;
   final int? recurrenceRuleId;
   final DateTime? dueDate;
+
+  /// Only ever set on a recurring task (non-null [recurrenceRuleId]) whose
+  /// *current* occurrence has been individually moved via "Reschedule
+  /// this occurrence": the occurrence's original, canonical date/time -
+  /// i.e. what [dueDate] would still be if it hadn't been rescheduled.
+  ///
+  /// `ReminderEngine` anchors recurrence math (computing the *next*
+  /// occurrence on completion/skip/catch-up) on
+  /// `occurrenceOriginalDate ?? dueDate` rather than on [dueDate] alone,
+  /// so a one-off reschedule can never drift the rest of the series. Null
+  /// for every non-recurring task and for a recurring task whose current
+  /// occurrence sits exactly where the rule says it should.
+  final DateTime? occurrenceOriginalDate;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? completedAt;
@@ -43,6 +57,10 @@ class TaskModel {
       dueDate: map[TasksTable.dueDate] == null
           ? null
           : DateTime.fromMillisecondsSinceEpoch(map[TasksTable.dueDate] as int),
+      occurrenceOriginalDate: map[TasksTable.occurrenceOriginalDate] == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(
+              map[TasksTable.occurrenceOriginalDate] as int),
       createdAt:
           DateTime.fromMillisecondsSinceEpoch(map[TasksTable.createdAt] as int),
       updatedAt:
@@ -64,6 +82,8 @@ class TaskModel {
       TasksTable.categoryId: categoryId,
       TasksTable.recurrenceRuleId: recurrenceRuleId,
       TasksTable.dueDate: dueDate?.millisecondsSinceEpoch,
+      TasksTable.occurrenceOriginalDate:
+          occurrenceOriginalDate?.millisecondsSinceEpoch,
       TasksTable.createdAt: createdAt.millisecondsSinceEpoch,
       TasksTable.updatedAt: updatedAt.millisecondsSinceEpoch,
       TasksTable.completedAt: completedAt?.millisecondsSinceEpoch,
@@ -88,6 +108,8 @@ class TaskModel {
     bool clearRecurrenceRuleId = false,
     DateTime? dueDate,
     bool clearDueDate = false,
+    DateTime? occurrenceOriginalDate,
+    bool clearOccurrenceOriginalDate = false,
     DateTime? createdAt,
     DateTime? updatedAt,
     DateTime? completedAt,
@@ -105,6 +127,9 @@ class TaskModel {
           ? null
           : (recurrenceRuleId ?? this.recurrenceRuleId),
       dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
+      occurrenceOriginalDate: clearOccurrenceOriginalDate
+          ? null
+          : (occurrenceOriginalDate ?? this.occurrenceOriginalDate),
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       completedAt: clearCompletedAt ? null : (completedAt ?? this.completedAt),

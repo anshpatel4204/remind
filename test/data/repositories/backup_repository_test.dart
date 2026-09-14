@@ -4,15 +4,18 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:remind/data/database/db_constants.dart';
 import 'package:remind/data/datasources/category_data_source.dart';
+import 'package:remind/data/datasources/occurrence_exception_data_source.dart';
 import 'package:remind/data/datasources/recurrence_rule_data_source.dart';
 import 'package:remind/data/datasources/reminder_data_source.dart';
 import 'package:remind/data/datasources/tag_data_source.dart';
 import 'package:remind/data/datasources/task_data_source.dart';
 import 'package:remind/data/datasources/task_tag_data_source.dart';
+import 'package:remind/data/backup/backup_constants.dart';
 import 'package:remind/data/backup/backup_exception.dart';
 import 'package:remind/data/models/enums.dart';
 import 'package:remind/data/repositories/backup_repository.dart';
 import 'package:remind/data/repositories/category_repository.dart';
+import 'package:remind/data/repositories/occurrence_exception_repository.dart';
 import 'package:remind/data/repositories/recurrence_repository.dart';
 import 'package:remind/data/repositories/reminder_repository.dart';
 import 'package:remind/data/repositories/tag_repository.dart';
@@ -34,6 +37,11 @@ Map<String, Object?> _emptyBackupJson({
   List<Object?>? taskTags,
   List<Object?>? reminders,
   List<Object?>? settings,
+  // Null (the default) omits the key entirely, simulating a pre-Part-12.5
+  // (backup schema v1) backup that predates this section - see
+  // BackupJsonKeys.occurrenceExceptions. Pass a list (even an empty one)
+  // to include the key, as a schema v2 backup always does.
+  List<Object?>? occurrenceExceptions,
 }) {
   return {
     'schemaVersion': schemaVersion,
@@ -47,6 +55,8 @@ Map<String, Object?> _emptyBackupJson({
       'taskTags': taskTags ?? [],
       'reminders': reminders ?? [],
       'settings': settings ?? [],
+      if (occurrenceExceptions != null)
+        'occurrenceExceptions': occurrenceExceptions,
     },
   };
 }
@@ -61,6 +71,7 @@ void main() {
   late TagRepository tagRepository;
   late RecurrenceRepository recurrenceRepository;
   late ReminderRepository reminderRepository;
+  late OccurrenceExceptionRepository occurrenceExceptionRepository;
 
   setUp(() {
     testDb = TestAppDatabase.create();
@@ -76,6 +87,8 @@ void main() {
         RecurrenceRepository(RecurrenceRuleDataSource(testDb.appDatabase));
     reminderRepository =
         ReminderRepository(ReminderDataSource(testDb.appDatabase));
+    occurrenceExceptionRepository = OccurrenceExceptionRepository(
+        OccurrenceExceptionDataSource(testDb.appDatabase));
   });
 
   tearDown(() => testDb.tearDown());
@@ -86,7 +99,7 @@ void main() {
       final json = await backupRepository.exportToJson();
       final decoded = jsonDecode(json) as Map<String, Object?>;
 
-      expect(decoded['schemaVersion'], 1);
+      expect(decoded['schemaVersion'], kBackupSchemaVersion);
       expect(decoded['appDatabaseVersion'], DbConfig.databaseVersion);
       expect(decoded['exportedAt'], isA<int>());
 
@@ -99,6 +112,7 @@ void main() {
       expect(data['taskTags'], isEmpty);
       expect(data['reminders'], isEmpty);
       expect(data['settings'], isEmpty);
+      expect(data['occurrenceExceptions'], isEmpty);
     });
   });
 
@@ -353,6 +367,89 @@ void main() {
       final restoredReminders =
           await targetReminderRepository.getRemindersForTask(task.id!);
       expect(restoredReminders, hasLength(1));
+    });
+  });
+
+  group('backup schema v2 (occurrenceExceptions)', () {
+    test(
+        'accepts a v1-schema backup that has no occurrenceExceptions '
+        'section at all', () {
+      final v1Backup = _emptyBackupJson(
+        schemaVersion: 1,
+        // occurrenceExceptions deliberately omitted (null) - this is
+        // exactly what a real backup made before Part 12.5 looks like.
+      );
+      final data = backupRepository.parseAndValidate(jsonEncode(v1Backup));
+      expect(data.occurrenceExceptions, isEmpty);
+      expect(data.totalRows, 0);
+    });
+
+    test('a v1-schema backup restores cleanly with no exceptions table data',
+        () async {
+      final v1Backup = _emptyBackupJson(schemaVersion: 1);
+      final data = backupRepository.parseAndValidate(jsonEncode(v1Backup));
+
+      await backupRepository.restore(data);
+
+      expect(await taskRepository.getAllTasks(), isEmpty);
+    });
+
+    test(
+        'rejects an occurrence exception referring to a recurrence rule '
+        'not present in the backup', () {
+      final orphanException = _emptyBackupJson(
+        occurrenceExceptions: [
+          {
+            OccurrenceExceptionsTable.id: 1,
+            OccurrenceExceptionsTable.recurrenceRuleId: 42,
+            OccurrenceExceptionsTable.occurrenceDate: 0,
+            OccurrenceExceptionsTable.status: 0,
+            OccurrenceExceptionsTable.createdAt: 0,
+          },
+        ],
+      );
+      expect(
+        () => backupRepository.parseAndValidate(jsonEncode(orphanException)),
+        throwsA(isA<BackupValidationException>()),
+      );
+    });
+
+    test(
+        'a full export/import round trip preserves occurrence exceptions '
+        'and their link to the recurrence rule', () async {
+      final rule = await recurrenceRepository.createRule(
+        frequency: RecurrenceFrequency.daily,
+        startDate: DateTime(2026, 1, 1, 8, 0),
+      );
+      await occurrenceExceptionRepository.recordSkipped(
+        recurrenceRuleId: rule.id!,
+        occurrenceDate: DateTime(2026, 1, 1, 8, 0),
+        now: DateTime(2026, 1, 1, 8, 5),
+      );
+
+      final exported = await backupRepository.exportToJson();
+
+      final targetDb = TestAppDatabase.create();
+      addTearDown(() => targetDb.tearDown());
+      final targetBackupRepository = BackupRepository(targetDb.appDatabase);
+      final targetRecurrenceRepository =
+          RecurrenceRepository(RecurrenceRuleDataSource(targetDb.appDatabase));
+      final targetOccurrenceExceptionRepository = OccurrenceExceptionRepository(
+          OccurrenceExceptionDataSource(targetDb.appDatabase));
+
+      final parsed = targetBackupRepository.parseAndValidate(exported);
+      await targetBackupRepository.restore(parsed);
+
+      final restoredRule = await targetRecurrenceRepository.getRule(rule.id!);
+      expect(restoredRule, isNotNull);
+
+      final restoredException =
+          await targetOccurrenceExceptionRepository.getForOccurrence(
+        rule.id!,
+        DateTime(2026, 1, 1, 8, 0),
+      );
+      expect(restoredException, isNotNull);
+      expect(restoredException?.status, OccurrenceExceptionStatus.skipped);
     });
   });
 }
