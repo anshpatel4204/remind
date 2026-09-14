@@ -93,3 +93,12 @@ coverage/
 # Environment / local overrides (never commit real secrets here)
 .env
 *.env.local
+
+# Local databases / backups - must never be committed or bundled
+*.db
+*.sqlite
+*.sqlite3
+/backups/
+**/backups/
+remind_backup_*.json
+remind_before_restore_*.json
